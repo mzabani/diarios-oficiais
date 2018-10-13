@@ -3,6 +3,7 @@ let
    packageOverrides = pkgs: rec {
      haskellPackages = pkgs.haskellPackages.override {
        overrides = haskellPackagesNew: haskellPackagesOld: rec {
+#         heist = haskellPackagesNew.callPackage haskellPackagesOld.heist { doCheck = false; };
          beam-migrate = haskellPackagesNew.callPackage ../beam/beam-migrate/cabal.nix { };
          beam-core = haskellPackagesNew.callPackage ../beam/beam-core/cabal.nix { };
          beam-postgres = haskellPackagesNew.callPackage ../beam/beam-postgres/cabal.nix { };

@@ -25,12 +25,16 @@ executable concursos-publicos-site
                      , beam-core
                      , beam-postgres
                      , text
+                     , bytestring
                      , aeson
                      , resource-pool
                      , http-api-data
                      , postgresql-simple
                      , brdocs
                      , concursos-publicos
-                     , shakespeare
+                     , heist
                      , blaze-html
                      , servant-blaze
+                     , lens
+                     , binary
+                     , string-conv
