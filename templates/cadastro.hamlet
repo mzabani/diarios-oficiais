@@ -46,7 +46,9 @@ $doctype 5
           console.log(response);#
           if (response.status === 'connected') {#
             jQuery.post('/fbLogin', { accessToken: response.authResponse.accessToken }).then(function(resp) {#
-              console.log('Resposta do nosso servidor: ' + resp);#
+              jQuery('#cadastro-form input[name="cadastroNomeCompleto"]').val(resp.fbNomeCompleto);#
+              jQuery('#cadastro-form input[name="cadastroEmail"]').val(resp.fbEmail);#
+              jQuery('#cadastro-form input[name="cadastroFbAccessToken"]').val(resp.fbAccessToken);#
             }, function() {#
               alert('Erro ao fazer login! Você concedeu todas as permissões pedidas?');#
             });#
@@ -58,20 +60,24 @@ $doctype 5
       }
 
     <body>
-        <form method="post" action="/cadastro">
-            <div class="form-group">
-                <input type="text" name="cadastroNomeCompleto" class="form-control" aria-describedby="nomeCompletoAjuda" placeholder="Coloque seu nome completo aqui, sem omitir nenhum nome">
-                <small id="nomeCompletoAjuda" class="form-text text-muted">Isso é importante para nos ajudar a te encontrar mesmo com eventuais variações de seu nome
-            <div class="form-group">
-                <input type="email" name="cadastroEmail" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter email">
-                <small id="emailHelp" class="form-text text-muted">We'll never share your email with anyone else.
-            <div class="form-group">
-                <label for="exampleInputPassword1">Password
-                <input type="password" class="form-control" id="exampleInputPassword1" placeholder="Password">
-            <div class="form-check">
-                <input type="checkbox" class="form-check-input" id="exampleCheck1">
-                <label class="form-check-label" for="exampleCheck1">Check me out
-            <button type="submit" class="btn btn-primary">Submit
+      <a href="/fblogin" class="btn btn-primary" id="fblogin" aria-label="ENTRAR COM FACEBOOK" aria-disabled="false">
+        <span id="strFb">
+          <fb:login-button scope="public_profile,email" onlogin="checkLoginState();">
+      <form method="post" action="/cadastro" id="cadastro-form">
+          <div class="form-group">
+              <input type="text" name="cadastroNomeCompleto" class="form-control" aria-describedby="nomeCompletoAjuda" placeholder="Coloque seu nome completo aqui, sem omitir nenhum nome">
+              <small id="nomeCompletoAjuda" class="form-text text-muted"><strong>Digite seu nome completo</strong>. Isso é importante para nos ajudar a te encontrar mesmo com eventuais variações de seu nome
+          <div class="form-group">
+              <input type="email" name="cadastroEmail" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" placeholder="Enter email">
+              <small id="emailHelp" class="form-text text-muted">We'll never share your email with anyone else.
+          <div class="form-group">
+              <label for="exampleInputPassword">Senha
+              <input type="password" name="cadastroSenha" class="form-control" id="exampleInputPassword" placeholder="Password">
+          <div class="form-group">
+              <label for="exampleConfirmPassword">Confirme sua senha
+              <input type="password" name="cadastroConfirmacaoSenha" class="form-control" id="exampleConfirmPassword" placeholder="Password">
+          <input type="hidden" name="cadastroFbAccessToken" />
+          <button type="submit" class="btn btn-primary">Cadastrar-me
                   
       <!-- Bootstrap core JavaScript -->
       <script src="vendor/jquery/jquery.min.js">

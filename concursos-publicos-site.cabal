@@ -1,7 +1,6 @@
 name:                concursos-publicos-site
 version:             0.1.0.0
--- synopsis:
--- description:
+synopsis:            Concursos Públicos Site
 homepage:            https://github.com/githubuser/ConcursosPublicosSite#readme
 license:             BSD3
 license-file:        LICENSE
@@ -10,8 +9,13 @@ maintainer:          mzabani@gmail.com
 copyright:           2018 Marcelo Zabani
 category:            Web
 build-type:          Simple
-cabal-version:       >=1.10
 extra-source-files:  README.md
+cabal-version:       >=1.10
+
+-- To avoid duplicated efforts in documentation and dealing with the
+-- complications of embedding Haddock markup inside cabal files, it is
+-- common to point users to the README.md file.
+description:         Please see the README on Github at <https://github.com/githubuser/ConcursosPublicos#readme>
 
 executable concursos-publicos-site
   hs-source-dirs:      src
@@ -45,3 +49,9 @@ executable concursos-publicos-site
                      , safe-exceptions
                      , resourcet
                      , unliftio-core
+  default-extensions: DataKinds
+                    , DeriveGeneric
+                    , OverloadedStrings
+                    , QuasiQuotes
+                    , RecordWildCards
+                    , DuplicateRecordFields

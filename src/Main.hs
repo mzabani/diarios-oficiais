@@ -1,11 +1,5 @@
-{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DuplicateRecordFields #-}
 module Main where
 
 import Data.Text
@@ -40,19 +34,19 @@ import Control.Monad.Trans.Resource
 import Control.Monad.IO.Unlift
 import Control.Exception.Safe hiding (Handler)
 
-data DadosCadastro = DadosCadastro { cadastroNomeCompleto :: Text, cadastroEmail :: Text } deriving Generic
+data DadosCadastro = DadosCadastro { cadastroNomeCompleto :: Text, cadastroEmail :: Text, cadastroAccessToken :: Text } deriving Generic
 data DadosFacebookLogin = DadosFacebookLogin { accessToken :: Text } deriving Generic
-data DadosPrePreenchidosParaCadastro = DadosPrePreenchidosParaCadastro { nomeCompleto :: Text, email :: Text, accessToken :: Text } deriving Generic
+data DadosFacebook = DadosFacebook { fbAccessToken :: Text, fbNomeCompleto :: Text, fbEmail :: Text } deriving Generic
 
 -- instance FromJSON DadosCadastro
 instance FromForm DadosCadastro
 instance FromForm DadosFacebookLogin
-instance ToJSON DadosPrePreenchidosParaCadastro
+instance ToJSON DadosFacebook
 
 type UserAPI = "cadastro" :> ReqBody '[FormUrlEncoded] DadosCadastro :> PostRedirect 301 String
                 :<|> "cadastro" :> Get '[HTML] Html
                 :<|> Get '[HTML] Html
-                :<|> "fbLogin" :> ReqBody '[FormUrlEncoded] DadosFacebookLogin :> Post '[JSON] DadosPrePreenchidosParaCadastro
+                :<|> "fbLogin" :> ReqBody '[FormUrlEncoded] DadosFacebookLogin :> Post '[JSON] DadosFacebook
                 :<|> Raw
 
 userAPI :: Proxy UserAPI
@@ -78,16 +72,20 @@ main = do
 cadastroGet :: Handler Html
 cadastroGet = return (toHtml $(shamletFile "templates/cadastro.hamlet"))
 
-cadastroPost :: Pool Connection -> DadosCadastro -> RedirectHandler String -- Handler String
+cadastroPost :: Pool Connection -> DadosCadastro -> RedirectHandler String
 cadastroPost connPool dc = do
+    -- TODO: Pegar userID a partir do Access Token (que deve ser válido) e inserir no banco
+    mgr <- newTlsManagerWith tlsManagerSettings
+    fbIdMaybe <- fmap (idCode . userId) <$> getFbUserFromAccessToken mgr (cadastroAccessToken dc)
     liftIO $ withResource connPool $ \conn -> withTransaction conn $
         runBeamPostgresDebug putStrLn conn $ runInsert $ insert (_usuarios aprovadosDb) $
             insertExpressions [UsuarioT {
                 _usuarioId = default_
                 , _usuarioEmail = val_ (cadastroEmail dc)
                 , _usuarioNomeCompleto = val_ (cadastroNomeCompleto dc)
+                , _usuarioFacebookId = val_ fbIdMaybe
             }]
-    redirect "/cadastro-realizado"
+    redirect "/cadastro-realizado"    
 
 index :: Handler Html
 index = let name = ("Marcelo" :: String) in return (toHtml $(shamletFile "templates/index.hamlet"))
@@ -99,6 +97,7 @@ fbAppToken = do
     return accToken
 
 getFbUserFromAccessToken :: MonadIO m => Manager -> Text -> m (Maybe User)
+getFbUserFromAccessToken _ "" = return Nothing
 getFbUserFromAccessToken mgr accessToken = liftIO . runResourceT $ runFacebookT Credentials {
     appName = "ePassei"
     , appId = "336251103621017"
@@ -110,16 +109,16 @@ getFbUserFromAccessToken mgr accessToken = liftIO . runResourceT $ runFacebookT 
             (Just True, Just perms, Just usrAccToken, Just userID) -> Just <$> getUser userID [] (Just usrAccToken)
             _ -> return Nothing
 
-fbLogin :: DadosFacebookLogin -> Handler DadosPrePreenchidosParaCadastro
+fbLogin :: DadosFacebookLogin -> Handler DadosFacebook
 fbLogin DadosFacebookLogin{..} = do
     mgr <- newTlsManagerWith tlsManagerSettings
     fbUsrMaybe <- getFbUserFromAccessToken mgr accessToken
     case fbUsrMaybe of
         Nothing -> error "Oops!"
-        Just fbUsr -> return DadosPrePreenchidosParaCadastro {
-            nomeCompleto = fromMaybe "" (userName fbUsr)
-            , email = fromMaybe "" (userEmail fbUsr)
-            , accessToken = accessToken
+        Just fbUsr -> return DadosFacebook {
+            fbNomeCompleto = fromMaybe "" (userName fbUsr)
+            , fbEmail = fromMaybe "" (userEmail fbUsr)
+            , fbAccessToken = accessToken
         }
 
 connString :: ConnectInfo
