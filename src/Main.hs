@@ -1,13 +1,11 @@
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE TemplateHaskell #-}
 module Main where
 
 import Data.Text
 import Servant
 import Servant.API
 import Servant.HTML.Blaze
-import ServantExtensions
 import Network.Wai
+import ServantExtensions
 import Network.Wai.Handler.Warp
 import GHC.Generics
 import Data.Aeson
@@ -33,6 +31,7 @@ import Data.String.Conv
 import Control.Monad.Trans.Resource
 import Control.Monad.IO.Unlift
 import Control.Exception.Safe hiding (Handler)
+import qualified Busca as Busca
 
 data DadosCadastro = DadosCadastro { cadastroNomeCompleto :: Text, cadastroEmail :: Text, cadastroAccessToken :: Text } deriving Generic
 data DadosFacebookLogin = DadosFacebookLogin { accessToken :: Text } deriving Generic
@@ -45,6 +44,8 @@ instance ToJSON DadosFacebook
 
 type UserAPI = "cadastro" :> ReqBody '[FormUrlEncoded] DadosCadastro :> PostRedirect 301 String
                 :<|> "cadastro" :> Get '[HTML] Html
+                :<|> "busca" :> Get '[HTML] Html
+                :<|> "busca" :> ReqBody '[FormUrlEncoded] Busca.FormBusca :> Post '[JSON] [ Busca.ResultadoBusca ]
                 :<|> Get '[HTML] Html
                 :<|> "fbLogin" :> ReqBody '[FormUrlEncoded] DadosFacebookLogin :> Post '[JSON] DadosFacebook
                 :<|> Raw
@@ -53,7 +54,9 @@ userAPI :: Proxy UserAPI
 userAPI = Proxy
 
 server :: Pool Connection -> Server UserAPI
-server connectionPool = cadastroPost connectionPool :<|> cadastroGet :<|> Main.index :<|> Main.fbLogin :<|> serveDirectoryWebApp "html"
+server connectionPool = cadastroPost connectionPool :<|> cadastroGet 
+                        :<|> Busca.buscaGet :<|> Busca.buscaPost connectionPool
+                        :<|> Main.index :<|> Main.fbLogin :<|> serveDirectoryWebApp "html"
 
 app :: Pool Connection -> Application
 app connectionPool = serve userAPI (server connectionPool)

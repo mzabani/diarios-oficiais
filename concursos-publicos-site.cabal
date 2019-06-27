@@ -22,7 +22,9 @@ executable concursos-publicos-site
   main-is:             Main.hs
   default-language:    Haskell2010
   other-modules:       ServantExtensions
+                     , Busca
   build-depends:       base >= 4.7 && < 5
+                     , rio
                      , wai
                      , warp
                      , servant
@@ -51,7 +53,10 @@ executable concursos-publicos-site
                      , unliftio-core
   default-extensions: DataKinds
                     , DeriveGeneric
+                    , DeriveAnyClass
                     , OverloadedStrings
                     , QuasiQuotes
                     , RecordWildCards
                     , DuplicateRecordFields
+                    , TypeOperators
+                    , TemplateHaskell
