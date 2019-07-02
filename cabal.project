@@ -1,0 +1,6 @@
+packages:
+  common/
+  backend/
+  frontend/
+  ../brdocs/
+  ../concursos-publicos/

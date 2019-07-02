@@ -32,34 +32,43 @@ import Control.Monad.Trans.Resource
 import Control.Monad.IO.Unlift
 import Control.Exception.Safe hiding (Handler)
 import qualified Busca as Busca
+import qualified Common as Common
 
 data DadosCadastro = DadosCadastro { cadastroNomeCompleto :: Text, cadastroEmail :: Text, cadastroAccessToken :: Text } deriving Generic
 data DadosFacebookLogin = DadosFacebookLogin { accessToken :: Text } deriving Generic
 data DadosFacebook = DadosFacebook { fbAccessToken :: Text, fbNomeCompleto :: Text, fbEmail :: Text } deriving Generic
 
--- instance FromJSON DadosCadastro
 instance FromForm DadosCadastro
 instance FromForm DadosFacebookLogin
 instance ToJSON DadosFacebook
 
-type UserAPI = "cadastro" :> ReqBody '[FormUrlEncoded] DadosCadastro :> PostRedirect 301 String
+type TraditionalAPI = "cadastro" :> ReqBody '[FormUrlEncoded] DadosCadastro :> PostRedirect 301 String
                 :<|> "cadastro" :> Get '[HTML] Html
                 :<|> "busca" :> Get '[HTML] Html
-                :<|> "busca" :> ReqBody '[FormUrlEncoded] Busca.FormBusca :> Post '[JSON] [ Busca.ResultadoBusca ]
+                :<|> "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON] [ Common.ResultadoBusca ]
                 :<|> Get '[HTML] Html
                 :<|> "fbLogin" :> ReqBody '[FormUrlEncoded] DadosFacebookLogin :> Post '[JSON] DadosFacebook
                 :<|> Raw
 
-userAPI :: Proxy UserAPI
-userAPI = Proxy
+type SinglePageAPI = "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON] Common.ResultadoBusca
+                    :<|> Raw
 
-server :: Pool Connection -> Server UserAPI
-server connectionPool = cadastroPost connectionPool :<|> cadastroGet 
+traditionalServer :: Pool Connection -> Server TraditionalAPI
+traditionalServer connectionPool = cadastroPost connectionPool :<|> cadastroGet 
                         :<|> Busca.buscaGet :<|> Busca.buscaPost connectionPool
                         :<|> Main.index :<|> Main.fbLogin :<|> serveDirectoryWebApp "html"
 
-app :: Pool Connection -> Application
-app connectionPool = serve userAPI (server connectionPool)
+traditionalApp :: Pool Connection -> Application
+traditionalApp connectionPool = serve (Proxy :: Proxy TraditionalAPI) (traditionalServer connectionPool)
+
+singlePageServer :: Pool Connection -> Server SinglePageAPI
+singlePageServer connectionPool = Busca.buscaPost connectionPool
+                        :<|> serveDirectoryWebApp "html-SPA"
+
+singlePageApp :: Pool Connection -> Application
+singlePageApp connectionPool = serve (Proxy :: Proxy SinglePageAPI) (singlePageServer connectionPool)
+
+app = singlePageApp
 
 -- Ideias importantes:
 -- Deixar usuários livres para visualizarem os últimos 7 diários de cada tipo (garantir que não acessem diários anteriores a isso e que as URLs sejam baseadas em hashes para evitar que alguém nos copie com facilidade)
