@@ -20,25 +20,23 @@ htmlHead :: Widget x ()
 htmlHead = 
     elAttr "link" (Map.fromList [("rel", "stylesheet"), ("href", "https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"), ("integrity", "sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"), ("crossorigin", "anonymous")]) (pure ())
 
+renderValor (ValorTexto t) = text t
+renderValor (ValorLista l) = el "ul" $ forM_ l $ \v -> el "li" $ renderValor v
+renderValor (ValorMatch antes match depois) = text antes >> el "strong" (text match) >> text depois
+
 htmlBody :: Widget x ()
 htmlBody = do
-    el "div" $ text "Busque nos diários!"
+    el "div" $ text "Busque nos diários oficiais!"
     input <- textInput def
     let dynStr = _textInput_value input
-        --queries = updated $ _element dynStr
         queries = tag (current dynStr) (keypress Enter input)
     resultadosEv <- search queries
     resultadosDyn <- holdDyn Nothing resultadosEv
     dyn_ $ ffor resultadosDyn $ \case
             Nothing -> el "div" $ text "Comece a digitar e aperte ENTER para buscar"
             Just (ErroBusca erroMsg) -> el "div" $ text erroMsg
-            Just (Resultados r) -> el "table" $
+            Just (Resultados r) -> el "table" $ do
                 el "tr" $
                     forM_ (colunas r) $ \col -> el "th" $ text col
-                forM_ (valores r) $ \res -> el "tr" $
-                    forM_ res $ \v -> el "td" $ text v
-    -- dynStr <- _textInput_value <$> textInput def
-    -- dyn_ $ ffor dynStr $ \str ->
-    --     el "ul" $
-    --         forM_ [1..T.length str] $ \i -> do
-    --             el "li" $ text (T.pack (show i))
+                forM_ (resultados r) $ \res -> el "tr" $
+                    forM_ res $ \v -> el "td" $ renderValor v

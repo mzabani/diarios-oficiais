@@ -64,3 +64,6 @@ executable backend
                     , DuplicateRecordFields
                     , TypeOperators
                     , TemplateHaskell
+                    , ExistentialQuantification
+                    , LambdaCase
+                    , ViewPatterns

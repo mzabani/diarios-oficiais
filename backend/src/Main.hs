@@ -45,7 +45,7 @@ instance ToJSON DadosFacebook
 type TraditionalAPI = "cadastro" :> ReqBody '[FormUrlEncoded] DadosCadastro :> PostRedirect 301 String
                 :<|> "cadastro" :> Get '[HTML] Html
                 :<|> "busca" :> Get '[HTML] Html
-                :<|> "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON] [ Common.ResultadoBusca ]
+                :<|> "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON] Common.ResultadoBusca
                 :<|> Get '[HTML] Html
                 :<|> "fbLogin" :> ReqBody '[FormUrlEncoded] DadosFacebookLogin :> Post '[JSON] DadosFacebook
                 :<|> Raw

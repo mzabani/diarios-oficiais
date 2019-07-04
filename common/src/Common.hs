@@ -13,5 +13,7 @@ data FormBusca = FormBusca {
 data ResultadoBusca = ErroBusca Text | Resultados Resultado deriving (Generic, ToJSON, FromJSON)
 data Resultado = Resultado {
     colunas :: [Text],
-    valores :: [[Text]]
+    resultados :: [[Valor]]
 } deriving (Generic, ToJSON, FromJSON)
+
+data Valor = ValorTexto Text | ValorMatch Text Text Text | ValorLista [Valor] deriving (Generic, ToJSON, FromJSON)

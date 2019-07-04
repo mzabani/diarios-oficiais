@@ -1,4 +1,4 @@
-dev-frontend:
+build-frontend:
 	nix-build -o frontend-result -A ghcjs.frontend
 
 ghcid-frontend:
