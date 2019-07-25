@@ -39,10 +39,17 @@ buscaGet = return (toHtml $(shamletFile "templates/busca.hamlet"))
 
 -- | Selectable armazena um FieldParser para extração dos resultados, uma expressão para dentro do SELECT e 
 -- parâmetros para o caso de precisar fornecer parâmetros para a Query
-data Selectable = forall a b. (FromField a, ToRow b) => Selectable Query b (a -> Valor) (FieldParser a)
+data Selectable = forall a. (FromField a) => Selectable QueryFrag (a -> Valor) (FieldParser a)
 
--- | Filterable armazena dados suficientes para construir pedaços de Query e valores a injetar para a cláusula WHERE
-data Filterable = forall b. ToRow b => Filterable Query b
+data QueryFrag = forall a. ToRow a => QueryFrag Query a
+
+instance IsString QueryFrag where
+    fromString s = QueryFrag (fromString s) ()
+instance Semigroup QueryFrag where
+    QueryFrag q1 p1 <> QueryFrag q2 p2 = QueryFrag (q1 <> q2) (p1 :. p2)
+
+runQueryWith :: MonadIO m => PgInternal.RowParser r -> Connection -> QueryFrag -> m [r]
+runQueryWith rowParser conn (QueryFrag query params) = liftIO $ queryWith rowParser conn query params
 
 createRowParser :: [Selectable] -> PgInternal.RowParser [Valor]
 createRowParser s = do
@@ -50,7 +57,7 @@ createRowParser s = do
     if RIO.length s /= n then
         error "oops"
     else
-        sequenceA $ fmap (\(Selectable _ _ toValor parser) -> toValor <$> fieldWith parser) s
+        sequenceA $ fmap (\(Selectable _ toValor parser) -> toValor <$> fieldWith parser) s
 
 data Consulta = Consulta {
     _select :: [Text]
@@ -73,10 +80,13 @@ parseConsulta fb =
         _grupos = colunasGrupos
     }
 
-pgArrayToValorMatch :: PGArray Text -> Valor
-pgArrayToValorMatch (fromPGArray -> l) = case l of
-    [antes, match, depois] -> ValorMatch antes match depois
-    _                      -> ValorTexto (Text.concat l)
+-- pgArrayToValorMatch :: PGArray Text -> Valor
+-- pgArrayToValorMatch (fromPGArray -> l) = case l of
+--     [antes, match, depois] -> ValorMatch antes match depois
+--     _                      -> ValorTexto (Text.concat l)
+
+pgArrayToValor :: PGArray Text -> Valor
+pgArrayToValor (fromPGArray -> l) = ValorTexto (Text.concat l)
 
 queryGrupos :: MonadIO m => FormBusca -> Connection -> m ResultadoBusca
 queryGrupos fb conn =
@@ -84,25 +94,24 @@ queryGrupos fb conn =
                 consulta = parseConsulta fb
                 filtroConteudo = _where consulta
                 comGroupBy = _grupos consulta /= []
-                regexpEscape = id
                 -- TODO: Unaccent
                 pegarSelectable = \case
-                    "data"     -> Just $ Selectable "diario.data" () (ValorTexto . Text.pack . showGregorian) fromField
-                    "diario"   -> Just $ Selectable "case when origemdiario.cidade is null then origemdiario.nomecompleto else origemdiario.cidade || '/' || origemdiario.estado end" () ValorTexto fromField
+                    "data"     -> Just $ Selectable "diario.data" (ValorTexto . Text.pack . showGregorian) fromField
+                    "diario"   -> Just $ Selectable "case when origemdiario.cidade is null then origemdiario.nomecompleto else origemdiario.cidade || '/' || origemdiario.estado end" ValorTexto fromField
                     "conteudo" ->
                         if filtroConteudo == "" then Nothing
-                        -- ^ Não mostramos todo o conteúdo de um diário, obviamente
-                        else if comGroupBy then Just $ Selectable "array_agg(match)" () (ValorLista . fmap pgArrayToValorMatch . fromPGArray) fromField
+                        -- ^ Não mostramos todo o conteúdo de uma seção, naturalmente
+                        -- else if comGroupBy then Just $ Selectable "regexp_split_to_array(ts_headline('portuguese', secaodiario.conteudo, plainto_tsquery('portuguese', ?), 'MinWords=1,MaxWords=15,MaxFragments=99999,FragmentDelimiter=~@~'), '~@~')" (ValorLista . fmap pgArrayToValorMatch . fromPGArray) fromField
                         -- ^ Queremos mostrar todos os matches se houver agrupamento e filtro de conteúdo
-                        else Just $ Selectable "match" () pgArrayToValorMatch fromField
+                        else Just $ Selectable (QueryFrag "regexp_split_to_array(ts_headline('portuguese', secaodiario.conteudo, plainto_tsquery('portuguese', ?), 'MinWords=1,MaxWords=15,MaxFragments=99999,FragmentDelimiter=~@~'), '~@~')" (Only filtroConteudo)) pgArrayToValor fromField
                         -- ^ Se não houver group by mostramos um match por resultado
 
                     -- Colunas para quando há agrupamento
-                    "qtd"      -> Just $ Selectable "count(*)" () (ValorTexto . Text.pack . show) (fromField :: FieldParser Integer)
+                    "qtd"      -> Just $ Selectable "count(*)" (ValorTexto . Text.pack . show) (fromField :: FieldParser Integer)
                     _          -> Nothing
                 pegarFilterable = \case
-                    "" -> Just $ Filterable "true" ()
-                    s  -> Just $ Filterable "conteudo ~* ?" (Only s)
+                    "" -> Just "true"
+                    s  -> Just $ QueryFrag "to_tsvector('portuguese', secaodiario.conteudo) @@ plainto_tsquery('portuguese', ?)" (Only s)
                 pegarGroupable = \case
                     "data"       -> Just "data"
                     "diario"     -> Just "origemdiario.id, origemdiario.nomecompleto, origemdiario.cidade, origemdiario.estado"
@@ -116,20 +125,19 @@ queryGrupos fb conn =
             in
             case (selectablesMay, filterablesMay, groupablesMay) of
                 -- TODO: Retornar status http erro apropriado em caso de query inválida
-                (Nothing, _, _) -> return $ ErroBusca "Lembre-se de selecionar alguma coluna (e.g. \"data\", \"conteudo\") e de usar um filtro como \"sendo:conteudo~habite-se\""
-                (_, Nothing, _) -> return $ ErroBusca "Lembre-se de selecionar filtrar colunas corretamente (e.g. \"data=2010-12-25\", \"conteudo~exonera\")"
+                (Nothing, _, _) -> return $ ErroBusca "Lembre-se de selecionar alguma coluna (e.g. \"data\", \"conteudo\") e de usar um filtro como \"sendo:conteudo~habite\""
+                (_, Nothing, _) -> return $ ErroBusca "Lembre-se de selecionar filtrar colunas corretamente (e.g. \"data=2010-12-25\", \"conteudo~exonerado\")"
                 (_, _, Nothing) -> return $ ErroBusca "Apenas algumas colunas podem ser agrupadas (e.g. data)"
                 (Just selectables, Just filterables, Just groupables) -> do
                     let
-                        selectClause = intercalateQuery ", " $ fmap (\(Selectable col _ _ _) -> col) selectables
-                        whereClause = if RIO.null filterables then "" else "where " <> (intercalateQuery " AND " $ fmap (\(Filterable expr _) -> expr) filterables)
+                        selectClause = intercalateQuery ", " $ fmap (\(Selectable col _ _) -> col) selectables
+                        whereClause = if RIO.null filterables then "" else "where " <> (intercalateQuery " AND " filterables)
                         groupByClause = if RIO.null groupables then "" else "group by " <> intercalateQuery ", " groupables
-                        fromTable = if filtroConteudo == "" then "conteudodiario" else "(select id, conteudo, regexp_matches(conteudo, '(.{0,100})(' || ? || ')(.{0,100})', 'gi') AS match from conteudodiario) as conteudodiario"
 
-                        valuesToInject = RIO.concatMap (\(Selectable _ r _ _) -> toRow r) selectables <> (if filtroConteudo == "" then [] else toRow (Only filtroConteudo)) <> RIO.concatMap (\(Filterable _ r) -> toRow r) filterables
                         customRowParser = createRowParser selectables
-                        query = "select " <> selectClause 
-                                    <> " from " <> fromTable
+                        pquery@(QueryFrag query _) = "select " <> selectClause 
+                                    <> " from secaodiario"
+                                    <> " join conteudodiario on conteudodiario.id = secaodiario.conteudodiarioid"
                                     <> " join diarioabaixartoconteudodiario dbcd on dbcd.conteudodiarioid = conteudodiario.id "
                                     <> " join diarioabaixar on diarioabaixar.id = dbcd.diarioabaixarid "
                                     <> " join diario on diario.id=diarioabaixar.diarioid "
@@ -137,10 +145,11 @@ queryGrupos fb conn =
                                     <> whereClause
                                     <> " "
                                     <> groupByClause
-                                    <> " limit 100"
+                                    <> " order by diario.data desc limit 100"
                                     -- TODO: Pensar em paginação
                     liftIO $ Prelude.print query
-                    res <- liftIO $ queryWith customRowParser conn query valuesToInject
+                    --res <- liftIO $ queryWith customRowParser conn query valuesToInject
+                    res <- runQueryWith customRowParser conn pquery
                     return $ Resultados (Resultado {
                         colunas = _select consulta,
                         resultados = res

@@ -32,6 +32,7 @@ import Control.Monad.Trans.Resource
 import Control.Monad.IO.Unlift
 import Control.Exception.Safe hiding (Handler)
 import qualified Busca as Busca
+import qualified Ler as Ler
 import qualified Common as Common
 
 data DadosCadastro = DadosCadastro { cadastroNomeCompleto :: Text, cadastroEmail :: Text, cadastroAccessToken :: Text } deriving Generic
@@ -51,6 +52,7 @@ type TraditionalAPI = "cadastro" :> ReqBody '[FormUrlEncoded] DadosCadastro :> P
                 :<|> Raw
 
 type SinglePageAPI = "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON] Common.ResultadoBusca
+                    :<|> "ler" :> Capture "conteudoDiarioId" Int :> Get '[PlainText] Text
                     :<|> Raw
 
 traditionalServer :: Pool Connection -> Server TraditionalAPI
@@ -63,6 +65,7 @@ traditionalApp connectionPool = serve (Proxy :: Proxy TraditionalAPI) (tradition
 
 singlePageServer :: Pool Connection -> Server SinglePageAPI
 singlePageServer connectionPool = Busca.buscaPost connectionPool
+                        :<|> Ler.lerDiario connectionPool
                         :<|> serveDirectoryWebApp "html-SPA"
 
 singlePageApp :: Pool Connection -> Application

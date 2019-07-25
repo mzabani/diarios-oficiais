@@ -19,6 +19,7 @@ executable backend
   main-is:             Main.hs
   other-modules:       ServantExtensions
                      , Busca
+                     , Ler
   -- other-extensions:
   build-depends:       base >=4.11 && <4.12
                      , common
