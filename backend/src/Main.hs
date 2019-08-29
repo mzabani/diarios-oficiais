@@ -3,6 +3,8 @@ module Main where
 import Data.Text
 import Servant
 import Servant.API
+import Servant.Auth.Server
+import Servant.Auth.Server.SetCookieOrphan ()
 import Servant.HTML.Blaze
 import Network.Wai
 import ServantExtensions
@@ -44,34 +46,48 @@ instance FromForm DadosFacebookLogin
 instance ToJSON DadosFacebook
 
 type TraditionalAPI = "cadastro" :> ReqBody '[FormUrlEncoded] DadosCadastro :> PostRedirect 301 String
-                :<|> "cadastro" :> Get '[HTML] Html
-                :<|> "busca" :> Get '[HTML] Html
-                :<|> "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON] Common.ResultadoBusca
-                :<|> Get '[HTML] Html
-                :<|> "fbLogin" :> ReqBody '[FormUrlEncoded] DadosFacebookLogin :> Post '[JSON] DadosFacebook
-                :<|> Raw
+                 :<|> "cadastro" :> Get '[HTML] Html
+                 :<|> "busca" :> Get '[HTML] Html
+                 :<|> "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON] Common.ResultadoBusca
+                 :<|> Get '[HTML] Html
+                 :<|> "fbLogin" :> ReqBody '[FormUrlEncoded] DadosFacebookLogin :> Post '[JSON] DadosFacebook
+                 :<|> Raw
 
 type SinglePageAPI = "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON] Common.ResultadoBusca
-                    :<|> "ler" :> Capture "conteudoDiarioId" Int :> Get '[PlainText] Text
-                    :<|> Raw
+                :<|> "ler" :> Capture "conteudoDiarioId" Int :> Get '[PlainText] Text
+                :<|> "login" :> Capture "email" String :> Get '[JSON] (Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie ] String)
+                :<|> Raw
+
+type AdminAPI = "whoami" :> Get '[JSON] String
 
 traditionalServer :: Pool Connection -> Server TraditionalAPI
 traditionalServer connectionPool = cadastroPost connectionPool :<|> cadastroGet 
                         :<|> Busca.buscaGet :<|> Busca.buscaPost connectionPool
                         :<|> Main.index :<|> Main.fbLogin :<|> serveDirectoryWebApp "html"
 
-traditionalApp :: Pool Connection -> Application
-traditionalApp connectionPool = serve (Proxy :: Proxy TraditionalAPI) (traditionalServer connectionPool)
+traditionalApp :: Pool Connection -> CookieSettings -> JWTSettings -> Application
+traditionalApp connectionPool cookieSettings jwtSettings = serve (Proxy :: Proxy TraditionalAPI) (traditionalServer connectionPool)
 
-singlePageServer :: Pool Connection -> Server SinglePageAPI
-singlePageServer connectionPool = Busca.buscaPost connectionPool
+singlePageServer :: Pool Connection -> CookieSettings -> JWTSettings -> Server SinglePageAPI
+singlePageServer connectionPool cookieSettings jwtSettings = 
+                             Busca.buscaPost connectionPool
                         :<|> Ler.lerDiario connectionPool
+                        :<|> jwtLogin cookieSettings jwtSettings
                         :<|> serveDirectoryWebApp "html-SPA"
 
-singlePageApp :: Pool Connection -> Application
-singlePageApp connectionPool = serve (Proxy :: Proxy SinglePageAPI) (singlePageServer connectionPool)
+type API auths = (Servant.Auth.Server.Auth auths OurUser :> AdminAPI) :<|> SinglePageAPI
 
-app = singlePageApp
+app connectionPool defaultCookieSettings jwtSettings = adminApi :<|> singlePageServer connectionPool defaultCookieSettings jwtSettings
+
+newtype OurUser = OurUser String deriving (Show, Generic)
+instance FromJWT OurUser
+instance FromJSON OurUser
+instance ToJWT OurUser
+instance ToJSON OurUser
+
+adminApi :: Servant.Auth.Server.AuthResult OurUser -> Server AdminAPI
+adminApi (Servant.Auth.Server.Authenticated user) = liftIO (print user) >> return (show user)
+adminApi _ =  throwAll err401
 
 -- Ideias importantes:
 -- Deixar usuários livres para visualizarem os últimos 7 diários de cada tipo (garantir que não acessem diários anteriores a isso e que as URLs sejam baseadas em hashes para evitar que alguém nos copie com facilidade)
@@ -79,10 +95,23 @@ app = singlePageApp
 -- Permitir que usuários cadastrados acompanhem CONVOCAÇÕES de alguns concursos
 main :: IO ()
 main = do
+    jwtKey <- generateKey
     connectionPool <- createPool (connect connString) close 1 300 10
+    let jwtCfg = defaultJWTSettings jwtKey
+        cfg = defaultCookieSettings Servant.:. jwtCfg Servant.:. EmptyContext
+        api = Proxy :: Proxy (API '[JWT])
     -- TODO: chamar "run" dentro de "bracket"
-    run 8080 (app connectionPool)
+    run 8080 $ serveWithContext api cfg (app connectionPool defaultCookieSettings jwtCfg)
     destroyAllResources connectionPool
+
+jwtLogin :: CookieSettings -> JWTSettings -> String -> Handler (Headers '[ Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie ] String)
+jwtLogin cookieSettings jwtSettings email = do
+    let usr = OurUser email
+    mApplyCookies <- liftIO $ acceptLogin cookieSettings jwtSettings usr
+    case mApplyCookies of
+        Nothing           -> throwError err401
+        Just applyCookies -> return $ applyCookies email
+
 
 cadastroGet :: Handler Html
 cadastroGet = return (toHtml $(shamletFile "templates/cadastro.hamlet"))
@@ -105,7 +134,7 @@ cadastroPost connPool dc = do
 index :: Handler Html
 index = let name = ("Marcelo" :: String) in return (toHtml $(shamletFile "templates/index.hamlet"))
 
-fbAppToken :: FacebookT Auth (ResourceT IO) AppAccessToken
+fbAppToken :: FacebookT Facebook.Auth (ResourceT IO) AppAccessToken
 fbAppToken = do
     -- TODO: Cachear o AppAccessToken por tempo
     accToken <- getAppAccessToken

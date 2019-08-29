@@ -28,6 +28,7 @@ executable backend
                      , warp
                      , servant
                      , servant-server
+                     , servant-auth-server
                      , beam-core
                      , beam-postgres
                      , text

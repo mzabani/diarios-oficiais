@@ -111,7 +111,7 @@ queryGrupos fb conn =
                     _          -> Nothing
                 pegarFilterable = \case
                     "" -> Just "true"
-                    s  -> Just $ QueryFrag "to_tsvector('portuguese', secaodiario.conteudo) @@ plainto_tsquery('portuguese', ?)" (Only s)
+                    s  -> Just $ QueryFrag "secaodiario.portuguese_tsvector @@ plainto_tsquery('portuguese', ?)" (Only s)
                 pegarGroupable = \case
                     "data"       -> Just "data"
                     "diario"     -> Just "origemdiario.id, origemdiario.nomecompleto, origemdiario.cidade, origemdiario.estado"
@@ -131,7 +131,7 @@ queryGrupos fb conn =
                 (Just selectables, Just filterables, Just groupables) -> do
                     let
                         selectClause = intercalateQuery ", " $ fmap (\(Selectable col _ _) -> col) selectables
-                        whereClause = if RIO.null filterables then "" else "where " <> (intercalateQuery " AND " filterables)
+                        whereClause = if RIO.null filterables then "" else "where " <> intercalateQuery " AND " filterables
                         groupByClause = if RIO.null groupables then "" else "group by " <> intercalateQuery ", " groupables
 
                         customRowParser = createRowParser selectables
