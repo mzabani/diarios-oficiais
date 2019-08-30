@@ -11,11 +11,11 @@ let
   };
 in
 reflex-platform.project ({ pkgs, ... }: {
-  name = "concursos-publicos-site";
+  name = "diarios-oficiais-site";
 
   packages = {
     brdocs = ../brdocs;
-    concursos-publicos = ../concursos-publicos;
+    diarios-oficiais = ./diarios-oficiais;
     common = ./common;
     backend = ./backend;
     frontend = ./frontend;
@@ -34,7 +34,7 @@ reflex-platform.project ({ pkgs, ... }: {
   };
 
   shells = {
-    ghc = ["common" "backend" "frontend" "brdocs" "concursos-publicos" ];
+    ghc = ["common" "backend" "frontend" "brdocs" "diarios-oficiais" ];
     ghcjs = ["common" "frontend"];
   };
 })

@@ -41,7 +41,7 @@ executable backend
                      , postgresql-simple
                      , brdocs
                      , shakespeare
-                     , concursos-publicos
+                     , diarios-oficiais
                      , blaze-html
                      , servant-blaze
                      , lens
