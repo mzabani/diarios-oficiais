@@ -16,4 +16,5 @@ data Resultado = Resultado {
     resultados :: [[Valor]]
 } deriving (Generic, ToJSON, FromJSON)
 
-data Valor = ValorTexto Text | ValorMatch Text Text Text | ValorLista [Valor] deriving (Generic, ToJSON, FromJSON)
+-- | ValorMatch tem booleanos que indicam se palavra é um match de busca (e portanto deve ficar em negrito)
+data Valor = ValorTexto Text | ValorMatch [(Text, Bool)] | ValorLista [Valor] deriving (Generic, ToJSON, FromJSON)

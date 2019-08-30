@@ -26,6 +26,15 @@ executable frontend
                      , aeson
                      , time
                      , containers
+                     , lens
   hs-source-dirs:      src
   default-language:    Haskell2010
-  default-extensions: OverloadedStrings, DeriveGeneric, LambdaCase, DeriveAnyClass, FlexibleContexts
+  default-extensions: OverloadedStrings
+                    , DeriveGeneric
+                    , LambdaCase
+                    , DeriveAnyClass
+                    , FlexibleContexts
+                    , RecursiveDo
+                    , RankNTypes
+                    , ScopedTypeVariables
+                    , AllowAmbiguousTypes

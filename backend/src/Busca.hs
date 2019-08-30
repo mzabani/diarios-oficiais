@@ -80,13 +80,13 @@ parseConsulta fb =
         _grupos = colunasGrupos
     }
 
--- pgArrayToValorMatch :: PGArray Text -> Valor
--- pgArrayToValorMatch (fromPGArray -> l) = case l of
---     [antes, match, depois] -> ValorMatch antes match depois
---     _                      -> ValorTexto (Text.concat l)
-
 pgArrayToValor :: PGArray Text -> Valor
-pgArrayToValor (fromPGArray -> l) = ValorTexto (Text.concat l)
+pgArrayToValor (fromPGArray -> l) = ValorLista $ fmap txtToValor l
+    where txtToValor s = case Text.splitOn "~#~" s of
+                            [] -> ValorTexto ""
+                            ss -> ValorMatch $ alternarMatches False ss
+          alternarMatches _ [] = []
+          alternarMatches negrito (x : xs) = (x, negrito) : alternarMatches (not negrito) xs
 
 queryGrupos :: MonadIO m => FormBusca -> Connection -> m ResultadoBusca
 queryGrupos fb conn =
@@ -103,7 +103,7 @@ queryGrupos fb conn =
                         -- ^ Não mostramos todo o conteúdo de uma seção, naturalmente
                         -- else if comGroupBy then Just $ Selectable "regexp_split_to_array(ts_headline('portuguese', secaodiario.conteudo, plainto_tsquery('portuguese', ?), 'MinWords=1,MaxWords=15,MaxFragments=99999,FragmentDelimiter=~@~'), '~@~')" (ValorLista . fmap pgArrayToValorMatch . fromPGArray) fromField
                         -- ^ Queremos mostrar todos os matches se houver agrupamento e filtro de conteúdo
-                        else Just $ Selectable (QueryFrag "regexp_split_to_array(ts_headline('portuguese', secaodiario.conteudo, plainto_tsquery('portuguese', ?), 'MinWords=1,MaxWords=15,MaxFragments=99999,FragmentDelimiter=~@~'), '~@~')" (Only filtroConteudo)) pgArrayToValor fromField
+                        else Just $ Selectable (QueryFrag "regexp_split_to_array(ts_headline('portuguese', secaodiario.conteudo, plainto_tsquery('portuguese', ?), 'MinWords=1,MaxWords=15,MaxFragments=99999,FragmentDelimiter=~@~,StartSel=~#~,StopSel=~#~'), '~@~')" (Only filtroConteudo)) pgArrayToValor fromField
                         -- ^ Se não houver group by mostramos um match por resultado
 
                     -- Colunas para quando há agrupamento
@@ -111,7 +111,7 @@ queryGrupos fb conn =
                     _          -> Nothing
                 pegarFilterable = \case
                     "" -> Just "true"
-                    s  -> Just $ QueryFrag "secaodiario.portuguese_tsvector @@ plainto_tsquery('portuguese', ?)" (Only s)
+                    s  -> Just $ QueryFrag "secaodiario.portuguese_conteudo_tsvector @@ plainto_tsquery('portuguese', ?)" (Only s)
                 pegarGroupable = \case
                     "data"       -> Just "data"
                     "diario"     -> Just "origemdiario.id, origemdiario.nomecompleto, origemdiario.cidade, origemdiario.estado"
@@ -145,10 +145,9 @@ queryGrupos fb conn =
                                     <> whereClause
                                     <> " "
                                     <> groupByClause
-                                    <> " order by diario.data desc limit 100"
+                                    <> " order by diario.data desc, secaodiario.ordem limit 100"
                                     -- TODO: Pensar em paginação
                     liftIO $ Prelude.print query
-                    --res <- liftIO $ queryWith customRowParser conn query valuesToInject
                     res <- runQueryWith customRowParser conn pquery
                     return $ Resultados (Resultado {
                         colunas = _select consulta,
@@ -157,6 +156,4 @@ queryGrupos fb conn =
 
 buscaPost :: Pool Connection -> FormBusca -> Servant.Handler ResultadoBusca
 buscaPost connPool fb =
-    -- TODO: Usar o mesmo Parser de documentos e procurar em tokens numéricos ou de texto
-    -- por diários que tenham todos os termos buscados
     withDbConnection connPool $ \conn -> queryGrupos fb conn
