@@ -1,3 +1,4 @@
+{ reflex-platform ? import ./nix/reflex-platform.git {} }:
 let
   basePkgs = import ./pkgs-from-json.nix { json = ./nixos-unstable.json; };
 
@@ -9,7 +10,7 @@ let
     sha256 = "1zsbi2zamlmfqwgi0jx1j9hayvryvah7i4w1g49nnzblfakysjiy";
   };
 in
-(import ./reflex-platform {}).project ({ pkgs, ... }: {
+reflex-platform.project ({ pkgs, ... }: {
   name = "concursos-publicos-site";
 
   packages = {
