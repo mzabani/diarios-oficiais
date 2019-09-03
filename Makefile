@@ -19,3 +19,11 @@ fetch:
 profile-diarios:
 	cabal new-build --enable-profiling diarios-oficiais-exe
 	cabal new-run diarios-oficiais-exe -- +RTS -4096m -p -T -RTS fetch
+
+db-restart:
+	dropdb -U postgres --if-exists ${PGDATABASE}
+	make db-update
+
+db-update:
+	./scripts/bootstrap-db.sh
+	find db-history -name '*.sql' | xargs ./scripts/aplicar-migracao.sh
