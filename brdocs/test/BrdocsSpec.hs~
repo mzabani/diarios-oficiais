@@ -1,0 +1,14 @@
+module BrdocsSpec where
+
+import Test.Hspec
+import Test.QuickCheck
+import Brdocs
+
+spec :: Spec
+spec = describe "Validação de CPFs" $ do
+  it "CPF em formato bonitinho" $ 
+    let cpfValido = "456.482.434-13" in printCpf <$> parseCpf cpfValido `shouldBe` Just cpfValido
+  it "CPF em formato numérico" $
+     printCpf <$> parseCpf "45648243413" `shouldBe` Just "456.482.434-13"
+  it "CPF inválido" $
+     parseCpf "45648243412" `shouldBe` Nothing

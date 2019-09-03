@@ -20,7 +20,7 @@ let
     name = "diarios-oficiais-site";
 
     packages = {
-      brdocs = ../brdocs;
+      brdocs = ./brdocs;
       diarios-oficiais = ./diarios-oficiais;
       common = ./common;
       backend = ./backend;
@@ -46,7 +46,11 @@ let
   });
 in
   {
+    ghcjs = deriv.ghcjs;
+    
     shells = {
+      ghcjs = deriv.shells.ghcjs;
+
       ghc = deriv.shells.ghc.overrideAttrs (old: {
         buildInputs = old.buildInputs ++ extraBuildInputs;
 

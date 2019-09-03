@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module AwsUtils where
 
 import Aws

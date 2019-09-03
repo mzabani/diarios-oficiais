@@ -207,9 +207,6 @@ detalharPagina (pageBlocos -> blocos) =
         quatroQuintosCompLinha = (4 / 5) * mediaComprimentoLinha
         mediaAlturaLinha :: Float
         mediaAlturaLinha = fromMaybe (2 * tamanhoMedioFonte) $ avgFilter (\(Bloco a1 _, Bloco a2 _) -> realToFrac <$> ((-) <$> top a2 <*> top a1)) (\t -> t > 0 && t <= 2 * tamanhoMedioFonte) $ List.zip blocos (List.drop 1 blocos)
-
-        snoc :: a -> NonEmpty a -> NonEmpty a
-        snoc v (x :| xs) = x :| xs ++ [v]
         
         -- 1. Primeiro separamos em colunas
         blocosPorColuna :: [NonEmpty Bloco]

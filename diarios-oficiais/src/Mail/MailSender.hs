@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Mail.MailSender where
 
 import Aws

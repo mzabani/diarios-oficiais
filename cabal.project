@@ -2,5 +2,5 @@ packages:
   common/
   backend/
   frontend/
-  ../brdocs/
+  brdocs/
   diarios-oficiais/

@@ -23,7 +23,6 @@ library
   exposed-modules:     ConcursosPublicos
                      , ConcursosPublicos.Database
                      , Model.Diarios
-                     , Model.Aprovados
                      , BeamUtils
   other-modules:       ConcursosPublicos.Xml
                      , ConcursosPublicos.Crawling
@@ -33,7 +32,6 @@ library
                      , Buscador
                      , AwsUtils
                      , Mail.MailSender
-                     , Zlude
                      , PdfParser.PandocHtmlParser
                      , PdfParser.DocumentoParserInteligente
                      , PdfParser.Estruturas
@@ -94,6 +92,7 @@ library
                     , QuasiQuotes
                     , ScopedTypeVariables
                     , LambdaCase
+                    , AllowAmbiguousTypes
 
 executable diarios-oficiais-exe
   hs-source-dirs:      app

@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables, RankNTypes #-}
 module ConcursosPublicos.Crawling where
 
 import Model.Diarios

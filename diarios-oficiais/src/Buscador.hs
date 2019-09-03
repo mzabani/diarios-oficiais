@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings #-}
 module Buscador where
 
 import qualified Data.List as List

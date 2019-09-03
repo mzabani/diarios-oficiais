@@ -69,7 +69,7 @@ htmlBody = do
                             return resultadosDyn
                 
                 divClass "alert alert-warning" $ el "ul" $ do
-                    el "li" $ text "Não me responsabilizo pelo conteúdo dos Diários exibidos. A importação dos Diários é um processo onde partes significativas destes podem se perder ou serem alteradas (e isso realmente acontece com frequência)."
+                    el "li" $ text "Não me responsabilizo pelo conteúdo dos Diários exibidos/buscados. A importação dos Diários é um processo onde partes significativas destes podem se perder ou serem alteradas (e isso realmente acontece com frequência)."
                     el "li" $ text "O código deste buscador é aberto. Acesse " >> elAttr "a" ("href" =: "https://github.com/mzabani/buscador-diarios-oficiais") (text "https://github.com/mzabani/buscador-diarios-oficiais") >> text " para ver."
                     el "li" $ text "Mesmo se não for desenvolvedor, fique à vontade para pedir a inclusão de um Diário Oficial ou uma funcionalidade. Especialmente se for para finalidade de pesquisa. Acesso o link do Github acima e crie uma \"Issue\" se quiser."
                 
@@ -77,6 +77,7 @@ htmlBody = do
                         NadaBuscado -> pure ()
                         Buscando t -> text $ "Buscando por '" <> t <> "'..."
                         BuscaTerminada (ErroBusca erroMsg) -> el "div" $ text erroMsg
+                        BuscaTerminada (Resultados (Resultado _ [])) -> el "div" $ text "Nenhum resultado encontrado.."
                         BuscaTerminada (Resultados r) -> elClass "table" "table table-bordered" $ do
                             el "tr" $
                                 forM_ (colunas r) $ \col -> el "th" $ text col

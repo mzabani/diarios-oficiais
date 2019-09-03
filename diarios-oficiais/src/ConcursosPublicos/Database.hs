@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
 module ConcursosPublicos.Database (
       createDbPool
 ) where

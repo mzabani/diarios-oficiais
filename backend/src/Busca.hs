@@ -3,7 +3,6 @@ module Busca where
 import RIO
 import qualified Data.Text as Text
 import Database.Beam
-import Text.Blaze.Html
 import Data.Aeson
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.List.NonEmpty (NonEmpty(..))
@@ -29,13 +28,9 @@ import Database.PostgreSQL.Simple.Types
 import Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.Internal as PgInternal
 import Data.Pool
-import Text.Hamlet
 import Model.Diarios
 import BeamUtils
 import Common
-
-buscaGet :: Servant.Handler Html
-buscaGet = return (toHtml $(shamletFile "templates/busca.hamlet"))
 
 -- | Selectable armazena um FieldParser para extração dos resultados, uma expressão para dentro do SELECT e 
 -- parâmetros para o caso de precisar fornecer parâmetros para a Query

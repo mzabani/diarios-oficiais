@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module ConcursosPublicos.Xml where
 
 import Data.Maybe

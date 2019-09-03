@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Crawlers.Campinas where
 
 import Model.Diarios
