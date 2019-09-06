@@ -1,7 +1,7 @@
 module Crawlers.Campinas where
 
 import Model.Diarios
-import ConcursosPublicos.Crawling
+import DiariosOficiais.Crawling
 import Database.Beam
 import Data.Time
 import Data.Maybe
@@ -11,7 +11,7 @@ import Text.HTML.DOM
 import Data.String.Conv
 import Text.XML.Cursor
 import System.FilePath
-import ConcursosPublicos.Xml
+import DiariosOficiais.Xml
 
 getPageLink :: MonadIO m => Day -> Manager -> m (Maybe T.Text)
 getPageLink dt mgr = do

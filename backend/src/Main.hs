@@ -7,6 +7,7 @@ import Network.Wai
 import ServantExtensions
 import Network.Wai.Handler.Warp
 import GHC.Generics
+import DiariosOficiais.Database (createDbPool)
 import Data.Aeson
 import Database.PostgreSQL.Simple
 import Data.Pool
@@ -16,6 +17,7 @@ import qualified Data.ByteString      as BS
 import qualified Data.ByteString.Lazy as LBS
 import Data.Text.Lazy.Encoding
 import Data.Binary.Builder
+import Text.Read (readMaybe)
 import Control.Exception.Safe hiding (Handler)
 import qualified Busca as Busca
 import qualified Ler as Ler
@@ -33,11 +35,7 @@ singlePageServer connectionPool =
 
 main :: IO ()
 main = do
-    -- TODO: chamar "createPool" dentro de "bracket"
-    connectionPool <- createPool (connect connString) close 1 300 10
-    let api = Proxy :: Proxy SinglePageAPI
-    run 8080 $ serve api (singlePageServer connectionPool)
-    destroyAllResources connectionPool
-
-connString :: ConnectInfo
-connString = defaultConnectInfo { connectHost = "localhost", connectUser = "diariosapp", connectDatabase = "diariosoficiais", connectPort = 5433 }
+    bracket (createDbPool 1 300 10) destroyAllResources $ \connectionPool -> do
+        let api = Proxy :: Proxy SinglePageAPI
+        run 8080 $ serve api (singlePageServer connectionPool)
+        destroyAllResources connectionPool

@@ -7,7 +7,7 @@ import qualified Database.Beam.Postgres as Pg
 import qualified Database.PostgreSQL.Simple as PGS
 import Data.Text
 
-data DiariosDb f = DiariosDb { origensDiarios :: f (TableEntity OrigemDiarioT), diarios :: f (TableEntity DiarioT), diariosABaixar :: f (TableEntity DiarioABaixarT), conteudosDiarios :: f (TableEntity ConteudoDiarioT), diariosABaixarToConteudosDiarios :: f (TableEntity DiarioABaixarToConteudoDiarioT), secoesDiarios :: f (TableEntity SecaoDiarioT), statusDownloads :: f (TableEntity StatusDownloadDiarioT), downloadsTerminados :: f (TableEntity DownloadTerminadoT), nomesEncontrados :: f (TableEntity NomeEncontradoT), tokensTextoTbl :: f (TableEntity TokenTextoT) } deriving Generic
+data DiariosDb f = DiariosDb { origensDiarios :: f (TableEntity OrigemDiarioT), diarios :: f (TableEntity DiarioT), diariosABaixar :: f (TableEntity DiarioABaixarT), conteudosDiarios :: f (TableEntity ConteudoDiarioT), diariosABaixarToConteudosDiarios :: f (TableEntity DiarioABaixarToConteudoDiarioT), secoesDiarios :: f (TableEntity SecaoDiarioT), paragrafosDiarios :: f (TableEntity ParagrafoDiarioT), statusDownloads :: f (TableEntity StatusDownloadDiarioT), downloadsTerminados :: f (TableEntity DownloadTerminadoT), nomesEncontrados :: f (TableEntity NomeEncontradoT), tokensTextoTbl :: f (TableEntity TokenTextoT) } deriving Generic
 instance Database be DiariosDb
 diariosDb :: DatabaseSettings be DiariosDb
 diariosDb = defaultDbSettings `withDbModification`
@@ -20,6 +20,7 @@ diariosDb = defaultDbSettings `withDbModification`
                 downloadsTerminados = modifyTable (const "downloadterminado") tableModification { downloadterminadoStatusDownloadDiarioId = StatusDownloadDiarioId "statusdownloaddiarioid", downloadterminadoMomentoTermino = "momentotermino", downloadterminadoMd5Sum = "md5sum", downloadterminadoFilePath = "filepath" },
                 diariosABaixarToConteudosDiarios = modifyTable (const "diarioabaixartoconteudodiario") tableModification { diarioabaixartoconteudodiarioDiarioABaixarId = DiarioABaixarId "diarioabaixarid", diarioabaixartoconteudodiarioConteudoDiarioId = ConteudoDiarioId "conteudodiarioid" },
                 secoesDiarios = modifyTable (const "secaodiario") tableModification { secaodiarioConteudoDiarioId = ConteudoDiarioId "conteudodiarioid", secaodiarioConteudo = "conteudo" },
+                paragrafosDiarios = modifyTable (const "paragrafodiario") tableModification { paragrafodiarioConteudoDiarioId = ConteudoDiarioId "conteudodiarioid", paragrafodiarioConteudo = "conteudo" },
                 nomesEncontrados = modifyTable (const "nomeencontrado") tableModification { nomeencontradoConteudoDiarioId = ConteudoDiarioId "conteudodiarioid", nomeencontradoLoweredNome = "lowerednome", nomeencontradoPosicao = "posicao" },
                 tokensTextoTbl = modifyTable (const "tokens_texto") tableModification { tokentextoConteudoDiarioId = ConteudoDiarioId "conteudo_diario_id" }
             }
@@ -99,6 +100,20 @@ instance Table SecaoDiarioT where
     data PrimaryKey SecaoDiarioT f = SecaoDiarioId (C f Int) deriving Generic
     primaryKey = SecaoDiarioId . secaodiarioId
 instance Beamable (PrimaryKey SecaoDiarioT)
+
+data ParagrafoDiarioT f = ParagrafoDiario {
+    paragrafodiarioId :: C f Int,
+    paragrafodiarioConteudoDiarioId :: PrimaryKey ConteudoDiarioT f,
+    paragrafodiarioOrdem :: C f Int,
+    paragrafodiarioConteudo :: C f Text
+} deriving Generic
+type ParagrafoDiario = ParagrafoDiarioT Identity
+type ParagrafoDiarioId = PrimaryKey ParagrafoDiarioT Identity
+instance Beamable ParagrafoDiarioT
+instance Table ParagrafoDiarioT where
+    data PrimaryKey ParagrafoDiarioT f = ParagrafoDiarioId (C f Int) deriving Generic
+    primaryKey = ParagrafoDiarioId . paragrafodiarioId
+instance Beamable (PrimaryKey ParagrafoDiarioT)
 
 data DiarioABaixarToConteudoDiarioT f = DiarioABaixarToConteudoDiario {
     diarioabaixartoconteudodiarioId :: C f Int,

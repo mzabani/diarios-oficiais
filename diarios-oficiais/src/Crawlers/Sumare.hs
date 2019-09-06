@@ -2,7 +2,7 @@
 module Crawlers.Sumare where
 
 import Model.Diarios
-import ConcursosPublicos.Crawling
+import DiariosOficiais.Crawling
 import Database.Beam
 import Data.Time
 import Data.Maybe
@@ -13,7 +13,7 @@ import Text.HTML.DOM
 import Data.String.Conv
 import Text.XML.Cursor
 import System.FilePath
-import ConcursosPublicos.Xml
+import DiariosOficiais.Xml
 import qualified Data.Attoparsec.Text as AT
 
 dataPtBrParser :: AT.Parser Day

@@ -1,3 +1,7 @@
+shell:
+	@rm -f .ghc.environment.*
+	nix-shell -A shells.ghc
+
 build-frontend:
 	nix-build -o frontend-result -A ghcjs.frontend
 
@@ -27,4 +31,4 @@ db-restart:
 db-update:
 	./scripts/bootstrap-db.sh
 	# TODO: Aplicar todas as migrações numa única transação (aplicação pós-deploy precisa de todas ou o deploy deve falhar)
-	find db-history -name '*.sql' | xargs ./scripts/aplicar-migracao.sh
+	find db-history -name '*.sql' | sort | xargs -L 1 ./scripts/aplicar-migracao.sh

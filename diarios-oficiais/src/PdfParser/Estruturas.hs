@@ -321,4 +321,4 @@ obterSecoes doc =
                         (Secao [x], [])
                         xs
                 in
-                    outrasSecoes ++ [ultimaSecao]
+                    outrasSecoes <> [ultimaSecao]

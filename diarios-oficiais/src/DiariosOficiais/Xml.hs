@@ -1,4 +1,4 @@
-module ConcursosPublicos.Xml where
+module DiariosOficiais.Xml where
 
 import Data.Maybe
 import qualified Data.Text as T

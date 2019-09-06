@@ -18,12 +18,12 @@ parsePdfAntigo pdfFilePaths = do
     let linhasDasPaginas = concatMap (T.lines . toS) conteudoPaginas
     return $ unirLinhas linhasDasPaginas
 
-parsePdfEmSecoes :: (MonadUnliftIO m, MonadIO m) => [FilePath] -> m [T.Text]
+parsePdfEmSecoes :: (MonadUnliftIO m, MonadIO m) => [FilePath] -> m [PP.Secao]
 parsePdfEmSecoes pdfFilePaths = do
   secoesE <- PP.parsePdf pdfFilePaths
   case secoesE of
     Left e -> error $ show e
-    Right secoes -> return $ fmap PP.printSecao secoes
+    Right secoes -> return secoes
 
 -- Com a geração de uma página em modo table e sem modo pelo pdftotext, é preciso ler o modo table
 -- e descobrir a largura da coluna da esquerda (e de outras se houver). Após descobrir a largura das colunas,

@@ -65,7 +65,7 @@ htmlBody = do
                                 btnAttrs = Map.fromList [ ("type", "submit"), ("class", "btn btn-outline-secondary") ]
                             divClass "input-group-append" $
                                 btn btnAttrs buscandoEv (text "Buscar")
-                            elClass "small" "form-text text-muted" $ text "Tente por exemplo \"data, diario, conteudo sendo: multa\" e aperte ENTER"
+                            elClass "small" "form-text text-muted" $ text "Tente por exemplo \"data, diario, paragrafo sendo: multa\" e aperte ENTER"
                             return resultadosDyn
                 
                 divClass "alert alert-warning" $ el "ul" $ do

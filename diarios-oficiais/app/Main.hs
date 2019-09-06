@@ -1,6 +1,6 @@
 module Main where
 
-import ConcursosPublicos
+import DiariosOficiais
 
 main :: IO ()
 main = start

@@ -69,3 +69,4 @@ executable backend
                     , ExistentialQuantification
                     , LambdaCase
                     , ViewPatterns
+                    , ScopedTypeVariables

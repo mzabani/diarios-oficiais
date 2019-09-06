@@ -1,10 +1,10 @@
-module ConcursosPublicos (start) where
+module DiariosOficiais (start) where
 
 import Model.Diarios
 import Brdocs
 import BeamUtils
-import ConcursosPublicos.Crawling
-import ConcursosPublicos.Database
+import DiariosOficiais.Crawling
+import DiariosOficiais.Database
 import RIO
 import UnliftIO.Environment
 import Data.Time
@@ -22,7 +22,8 @@ import Data.Conduit.Binary
 import Data.String.Conv
 import Database.Beam
 import Network.HTTP.Conduit
-import PdfParser
+import qualified PdfParser as PP
+import qualified PdfParser.Estruturas as PP
 import Buscador
 import AwsUtils
 import qualified Aws
@@ -63,29 +64,29 @@ start = do
   putStrLn "Passe a opção \"fetch\" para baixar todos os diários dos últimos 365 dias e não passe opção nenhuma para baixar continuamente diários"
   let mgrSettings = Http.tlsManagerSettings { Http.managerModifyRequest = \req -> return req { requestHeaders = [("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36")] } }
   mgr <- newManager mgrSettings
-  dbPool <- createDbPool
-  homeDir <- getHomeDirectory
-  let basePath = homeDir </> "Diarios/"
-  createDirectoryIfMissing False basePath
-  awsConfig <- createAwsConfiguration
-  let ctx = AppContext {
-    mgr = mgr,
-    dbPool = dbPool,
-    basePath = basePath,
-    awsConfig = awsConfig
-  }
-  hj <- hoje
-  args <- getArgs
-  case args of
-    [ "fetch" ] ->
-      forM_ [0..365] $ \i -> do
-        let dt = addDays ((-1) * i) hj
-        Fold.forM_ allCrawlers $ \sub -> downloadEIndexar dt ctx sub
-    _ ->
-      forever $ do
-        forM_ allCrawlers $ downloadEIndexar hj ctx
-        putStrLn "Diários baixados. Esperando 1 hora para baixar novamente."
-        threadDelay (1000 * 1000 * 60 * 60) -- Wait for 1 hour (threadDelay takes microseconds)
+  bracket (createDbPool 1 60 50) destroyAllResources $ \dbPool -> do
+    homeDir <- getHomeDirectory
+    let basePath = homeDir </> "Diarios/"
+    createDirectoryIfMissing False basePath
+    awsConfig <- createAwsConfiguration
+    let ctx = AppContext {
+      mgr = mgr,
+      dbPool = dbPool,
+      basePath = basePath,
+      awsConfig = awsConfig
+    }
+    hj <- hoje
+    args <- getArgs
+    case args of
+      [ "fetch" ] ->
+        forM_ [0..365] $ \i -> do
+          let dt = addDays ((-1) * i) hj
+          Fold.forM_ allCrawlers $ \sub -> downloadEIndexar dt ctx sub
+      _ ->
+        forever $ do
+          forM_ allCrawlers $ downloadEIndexar hj ctx
+          putStrLn "Diários baixados. Esperando 1 hora para baixar novamente."
+          threadDelay (1000 * 1000 * 60 * 60) -- Wait for 1 hour (threadDelay takes microseconds)
 
 data AppContext = AppContext {
   mgr :: Manager,
@@ -141,18 +142,16 @@ downloadEIndexar hj AppContext{..} sub = do
               downloadterminadoMd5Sum = val_ $ toS (show md5),
               downloadterminadoFilePath = val_ $ toS pdfFilePath
             }
-          -- TODO: Renomear ConteudoDiario para DiarioABaixar e remover dele propriedade conteúdo.
-          -- Daí criar entidade ConteudoDiario que referencie DiarioABaixar e que tenha o conteúdo
-          liftIO $ print (ordem, l)
           return pdfFilePath
 
-        secoesPdfEmTexto <- parsePdfEmSecoes downloads
+        secoesPdf <- PP.parsePdfEmSecoes downloads
 
         -- Aqui pegamos um md5sum de todo o conteúdo. Podemos pegar diretamente de "conteudoTextoPdf" pois aí mudanças
         -- no conversor pdf -> texto irão ativar o código de mudança de conteúdo que vem depois
-        let conteudoTextoPdf = T.concat secoesPdfEmTexto
+        let conteudoTextoPdf = T.concat $ fmap PP.printSecao secoesPdf
             conteudoMd5Sum = hash ((toS conteudoTextoPdf) :: ByteString) :: Digest MD5
             md5sumString   = show conteudoMd5Sum
+            paragrafosDiario = RIO.concatMap PP.secaoConteudo secoesPdf
         writeFileUtf8 (basePath </> md5sumString <.> ".txt") conteudoTextoPdf
         conteudoDiario <- withDbTransaction conn $ do
           conteudoDiario <- insertOrGet_ conn (conteudosDiarios diariosDb) ConteudoDiario {
@@ -167,24 +166,39 @@ downloadEIndexar hj AppContext{..} sub = do
           }
           return conteudoDiario
 
-        -- TODO: Se as Seções forem muito grandes.. o trecho abaixo jogará uma exceção. Precisamos
-        -- capturar e precisamos de um Fallback (quem sabe páginas?)
-        withDbTransaction conn $
-          forM_ (RIO.zip [0..] secoesPdfEmTexto) $ \(i, textoSecao) -> do
-            -- TODO: insertOnConflictUpdate
-            insertOnNoConflict conn (secoesDiarios diariosDb) SecaoDiario {
-              secaodiarioId = default_,
-              secaodiarioConteudoDiarioId = val_ $ pk conteudoDiario,
-              secaodiarioOrdem = val_ i,
-              secaodiarioConteudo = val_ textoSecao
+        -- -- TODO: Se as Seções forem muito grandes.. o trecho abaixo jogará uma exceção. Precisamos
+        -- -- capturar e precisamos de um Fallback (quem sabe páginas?)
+        -- withDbTransaction conn $
+        --   forM_ (RIO.zip [0..] secoesPdfEmTexto) $ \(i, textoSecao) -> do
+        --     -- TODO: insertOnConflictUpdate
+        --     insertOnNoConflict conn (secoesDiarios diariosDb) SecaoDiario {
+        --       secaodiarioId = default_,
+        --       secaodiarioConteudoDiarioId = val_ $ pk conteudoDiario,
+        --       secaodiarioOrdem = val_ i,
+        --       secaodiarioConteudo = val_ textoSecao
+        --     }
+        
+        withDbTransaction conn $ do
+          -- TODO: insertOnConflictUpdate ao invés de insertOnNoConflict e apagar apenas parágrafos com ordem maior que o último (código comentado mais abaixo)
+          -- runDelete $ delete (paragrafosDiarios diariosDb) (\pd -> paragrafodiarioConteudoDiarioId pd ==. val_ (pk conteudoDiario))
+          forM_ (RIO.zip [0..] paragrafosDiario) $ \(i, paragrafo) -> do
+            insertOnNoConflict conn (paragrafosDiarios diariosDb) ParagrafoDiario {
+              paragrafodiarioId = default_,
+              paragrafodiarioConteudoDiarioId = val_ $ pk conteudoDiario,
+              paragrafodiarioOrdem = val_ i,
+              paragrafodiarioConteudo = val_ $ PP.printParagrafo paragrafo
             }
+          -- let ordemUltimoParagrafo = RIO.length paragrafosDiario - 1
+          -- runDelete $ delete (paragrafosDiarios diariosDb) (\pd -> paragrafodiarioOrdem pd >. ordemUltimoParagrafo &&. paragrafodiarioConteudoDiarioId ==. pk conteudoDiario)
 
         -- TODO: Tudo daqui pra baixo deveria ser uma função separada para que possa ser executada
         -- para diários antigos quando introduzimos novidades (e.g. mais tokens buscáveis)
         let docDiario@(DocumentoDiario tokensEPosicoes) = parseConteudoDiario conteudoTextoPdf
         
-        -- 1. Inserção de tokens buscáveis de todos tipos que nos interessarem
-        withDbTransaction conn $
+        -- Inserção de tokens buscáveis de todos tipos que nos interessarem
+        withDbTransaction conn $ do
+          -- TODO: DELETE!
+          -- runDelete $ delete (tokensTextoTbl diariosDb) (\tt -> tokentextoConteudoDiarioId tt ==. val_ (pk conteudoDiario))
           forM_ tokensEPosicoes $ \(pos, token) ->
             case token of
               TokenCpf (cpfTexto, cpf) ->

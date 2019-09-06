@@ -1,7 +1,7 @@
 name:                diarios-oficiais
 version:             0.1.0.0
-synopsis:            Short description of your package
-homepage:            https://github.com/githubuser/ConcursosPublicos#readme
+synopsis:            Interface web para fazer fetching e busca de conteúdo em diários oficiais
+homepage:            https://github.com/mzabani/diarios-oficiais#readme
 license:             BSD3
 license-file:        LICENSE
 author:              Marcelo Zabani
@@ -15,23 +15,22 @@ cabal-version:       >=1.10
 -- To avoid duplicated efforts in documentation and dealing with the
 -- complications of embedding Haddock markup inside cabal files, it is
 -- common to point users to the README.md file.
-description:         Please see the README on Github at <https://github.com/githubuser/ConcursosPublicos#readme>
+description:         Veja o README no Github em <https://github.com/mzabani/diarios-oficiais#readme>
 
 library
   hs-source-dirs:      src
   ghc-options:         -Wall -O2
-  exposed-modules:     ConcursosPublicos
-                     , ConcursosPublicos.Database
+  exposed-modules:     DiariosOficiais
+                     , DiariosOficiais.Database
                      , Model.Diarios
                      , BeamUtils
-  other-modules:       ConcursosPublicos.Xml
-                     , ConcursosPublicos.Crawling
+  other-modules:       DiariosOficiais.Xml
+                     , DiariosOficiais.Crawling
                      , Crawlers.Campinas
                      , Crawlers.Sumare
                      , PdfParser
                      , Buscador
                      , AwsUtils
-                     , Mail.MailSender
                      , PdfParser.PandocHtmlParser
                      , PdfParser.DocumentoParserInteligente
                      , PdfParser.Estruturas
@@ -97,7 +96,6 @@ library
 executable diarios-oficiais-exe
   hs-source-dirs:      app
   main-is:             Main.hs
-  --ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -Wpartial-fields -O2
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -Wpartial-fields -O2
   build-depends:       base
                      , diarios-oficiais
@@ -114,4 +112,4 @@ test-suite diarios-oficiais-test
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/ConcursosPublicos
+  location: https://github.com/mzabani/diarios-oficiais

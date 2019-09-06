@@ -1,4 +1,4 @@
-module ConcursosPublicos.Crawling where
+module DiariosOficiais.Crawling where
 
 import Model.Diarios
 import Data.Time
