@@ -72,9 +72,9 @@ htmlBody = do
                 
                 divClass "alert alert-warning" $ el "ul" $ do
                     el "li" $ do
-                        text "Não me responsabilizo pelo conteúdo dos Diários exibidos/buscados. A importação dos Diários é um processo onde partes significativas destes podem se perder ou serem alteradas (e isso realmente acontece com frequência)."
                         el "ul" $ do
-                            el "li" $ el "strong" "Sempre verifique o conteúdo encontrado" >> text " antes de assumir que está encontrando o que pensa estar buscando"
+                            el "li" $ text "Não me responsabilizo pelo conteúdo dos Diários exibidos/buscados. A importação dos Diários é um processo onde partes significativas destes podem se perder ou serem alteradas (e isso realmente acontece com frequência)."
+                            el "li" $ el "strong" (text "Sempre verifique o conteúdo encontrado") >> text " antes de assumir que está encontrando o que pensa estar buscando"
                             el "li" $ text "O buscador busca parágrafos, mas o que é exatamente um parágrafo aqui pode variar muito, e geralmente não corresponderá ao que humanos entendem por parágrafo"
                     el "li" $ text "O código deste buscador é aberto. Acesse " >> elAttr "a" ("href" =: "https://github.com/mzabani/diarios-oficiais") (text "https://github.com/mzabani/diarios-oficiais") >> text " para ver."
                     el "li" $ text "Por enquanto apenas o Diário Oficial da cidade de Campinas está disponível, " >> el "strong" (text "em geral") >> text " para os últimos 365 dias"
