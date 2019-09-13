@@ -10,10 +10,10 @@ data FormBusca = FormBusca {
 } deriving (Generic, ToJSON, FromJSON)
 
 -- TODO: Indexar comprimento de colunas e valores para que sejam iguais!
-data ResultadoBusca = ErroBusca Text | Resultados Resultado deriving (Generic, ToJSON, FromJSON)
+data ResultadoBusca = ErroBusca Text | Resultados Int Resultado deriving (Generic, ToJSON, FromJSON)
 data Resultado = Resultado {
     colunas :: [Text],
-    resultados :: [[Valor]]
+    resultados :: [(Maybe Int, [Valor])]
 } deriving (Generic, ToJSON, FromJSON)
 
 -- | ValorMatch tem booleanos que indicam se palavra é um match de busca (e portanto deve ficar em negrito)

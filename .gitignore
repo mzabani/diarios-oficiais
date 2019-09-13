@@ -4,3 +4,5 @@ dist-newstyle/
 frontend-result
 postgres-datadir/
 .ghc.environment.*
+data/
+keys/

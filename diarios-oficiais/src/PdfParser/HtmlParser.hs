@@ -5,6 +5,7 @@ import RIO.Directory
 import RIO.FilePath
 import qualified RIO.List as List
 import qualified RIO.Text as Text
+import qualified Data.Text as Text (replace)
 import qualified RIO.Map as Map
 import qualified Data.Attoparsec.Text as Parsec
 import Data.List.NonEmpty (NonEmpty(..))
@@ -42,11 +43,6 @@ parsePdf pdfFilePaths = do
         Right pgs -> do
             let doc = detalharDocumento pgs
                 secoesDoc = obterSecoes doc
-
-            -- forM_ (List.zip [1..30] secoesDoc) $ \(i, s) -> do
-            --     let nomeArquivo = "./pdf-secao" <> show i <> ".txt"
-            --     writeFileUtf8 nomeArquivo (printSecao s)
-            --     readProcess (shell $ "code " <> nomeArquivo)
             
             return (Right secoesDoc)
 
@@ -55,18 +51,10 @@ divListToPage blocks' =
     let
         blocos = fmap (elementToBloco emptyAttrs) blocks'
     in Page { pageBlocos = fmap (simplificarBloco emptyAttrs) blocos }
-    -- TODO: Melhor que pegar altura da imagem é procurar as linhas mais altas (e mais baixas) para ver linhas que se repetem em todas as páginas.
-    --       Estas quase que certamento serão cabeçalhos e rodapés
-    -- TODO: Linhas entre parágrafos devem ser inseridas calculando a diferença de altura entre blocos consecutivos para extrair a altura das linhas,
-    --       e aí quando o salto for muito grande, temos um parágrafo
-    where
-        --   isBlockEl :: Name -> Bool
-        --   isBlockEl "div" = True
-        --   isBlockEl _ = False
 
+    where
           elementToBloco :: AttrsBloco -> Element -> Bloco
           elementToBloco attrs (Element _ divAttrs inlineNodes) = Bloco (mixAttrs attrs (makeAttrs (Map.toList divAttrs))) $ Left $ makeText inlineNodes
-          -- elementToBloco _ el = error $ "elementToBloco " <> show el
 
           makeText :: [Node] -> [TextEl]
           makeText inls = RIO.concatMap inlineToText inls
@@ -74,15 +62,6 @@ divListToPage blocks' =
           inlineToText :: Node -> [TextEl]
           inlineToText (NodeContent s) = [ TextEl { atributos = emptyAttrs, texto = Left s } ]
           inlineToText (NodeElement (Element _ elAttrs els)) = [ TextEl { atributos = makeAttrs (Map.toList elAttrs), texto = Right (makeText els) } ]
-        --   inlineToText Space = [ TextEl { atributos = emptyAttrs, texto = Left " " } ]
-        --   inlineToText LineBreak = [ TextEl { atributos = emptyAttrs, texto = Left "\n" } ]
-        --   inlineToText SoftBreak = [ TextEl { atributos = emptyAttrs, texto = Left "\n" } ]
-        --   inlineToText (Span (_, _, spanAttr) inls) = [ TextEl { atributos = makeAttrs spanAttr, texto = Right (makeText inls) } ]
-        --   inlineToText (Image _ _ _) = [ ]
-        --   inlineToText (Quoted quoteType inls) = let quoteTel = TextEl { atributos = emptyAttrs, texto = Left (if quoteType == SingleQuote then "'" else "\"") } in quoteTel : (makeText inls <> [quoteTel])
-        --   inlineToText (Link (_, _, linkAttr) inls _) = [ TextEl { atributos = makeAttrs linkAttr, texto = Right (makeText inls) } ]
-        --   inlineToText (Math InlineMath t) = [ TextEl { atributos = emptyAttrs, texto = Left (Text.pack t) } ]
-        --   inlineToText (Math DisplayMath t) = [ TextEl { atributos = emptyAttrs, texto = Left ("\n" <> (Text.pack t) <> "\n") } ]
           inlineToText el = error $ "inlineToText " <> show el
 
           simplificarBloco :: AttrsBloco -> Bloco -> Bloco
@@ -106,10 +85,7 @@ divListToPage blocks' =
                         Left t ->
                             case t of
                                 "ﬁ" -> tel { texto = Left "fi", atributos = attrsPai } -- TODO: Não está funcionando
-                                _ -> tel { atributos = attrsTel }
-                            -- case (t, fontSizeInline (atributos tel)) of
-                            --     ("ﬁ", Just _) -> tel { texto = Left "fi", atributos = attrsPai } -- TODO: Não está funcionando
-                            --     _ -> tel { atributos = attrsTel }
+                                _ -> tel { texto = Left (Text.replace "ﬁ" "fi" t), atributos = attrsTel }
                         Right [ singleTel ] ->
                             -- Podemos substituir um Inline com um único filho pelo próprio filho
                             simplificarTextEl (mixAttrs attrsTel (atributos singleTel)) singleTel

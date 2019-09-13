@@ -32,6 +32,7 @@ let
       beam-postgres = basePkgs.haskellPackages.beam-postgres;
       beam-core = basePkgs.haskellPackages.beam-core;
       regex = basePkgs.haskellPackages.regex;
+      # attoparsec-time-1 = basePkgs.haskell.lib.dontCheck basePkgs.haskellPackages.attoparsec-time-1;
       # beam-migrate = basePkgs.haskell.lib.dontCheck (self.callCabal2nix "beam-migrate" "${beamSrc}/beam-migrate" {});
       # beam-postgres = basePkgs.haskell.lib.dontCheck (self.callCabal2nix "beam-postgres" "${beamSrc}/beam-postgres" {});
       # beam-core = basePkgs.haskell.lib.dontCheck (self.callCabal2nix "beam-core" "${beamSrc}/beam-core" {});

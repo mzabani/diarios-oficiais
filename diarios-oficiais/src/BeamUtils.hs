@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes, FlexibleContexts, PartialTypeSignatures, ScopedTypeVariables #-}
-module BeamUtils (insertOrThrow, insertReturningOrThrow, insertOnNoConflict, insertOrGet, insertOrGet_, withDbConnection, withDbTransaction, withDbTransaction_, RowOperation(..)) where
+module BeamUtils (beamInsertOrThrow, beamInsertReturningOrThrow, beamInsertOnNoConflict, beamInsertOrGet, beamInsertOrGet_, beamDelete, withDbConnection, withDbTransaction, withDbTransaction_, RowOperation(..), MonadBeamPostgres) where
 
 import Data.Conduit
 import Database.Beam
@@ -29,21 +29,22 @@ conduitRight :: Monad m => ConduitM () b m () -> m (Maybe b)
 conduitRight c = runConduit (c .| await)
 
 type PgBeam table m db = (FromBackendRow Pg.Postgres (table Identity), Database Pg.Postgres db, Beamable table, MonadIO m)
+type MonadBeamPostgres m = MonadBeam Pg.Postgres m
 
-insertOrThrow :: PgBeam table m db =>
+beamInsertOrThrow :: PgBeam table m db =>
     PGS.Connection
     -> DatabaseEntity Pg.Postgres db (TableEntity table)
     -> (forall s'. table (QExpr Pg.Postgres s'))
     -> m ()
-insertOrThrow conn tbl val = insertReturningOrThrow conn tbl val >> return ()
+beamInsertOrThrow conn tbl val = beamInsertReturningOrThrow conn tbl val >> return ()
 
-insertReturningOrThrow :: PgBeam table m db =>
+beamInsertReturningOrThrow :: PgBeam table m db =>
     PGS.Connection
     -> DatabaseEntity Pg.Postgres db (TableEntity table)
     -> (forall s'. table (QExpr Pg.Postgres s'))
     -> m (table Identity)
-insertReturningOrThrow conn tbl val =
-    liftIO $ Pg.runBeamPostgresDebug putStrLn conn $ do
+beamInsertReturningOrThrow conn tbl val =
+    liftIO $ Pg.runBeamPostgres conn $ do
         retList <- runInsertReturningList (insert tbl (insertExpressions [ val ]))
         case retList of
             [ret] -> return ret
@@ -53,44 +54,52 @@ insertReturningOrThrow conn tbl val =
     --     Nothing  -> error "insertReturning returned Nothing.. impossible (it should throw on conflict or return a newly inserted row)!"
     --     Just ret -> return ret
 
-insertOnNoConflict :: (FromBackendRow Pg.Postgres (table Identity), Beamable table, Monad m, MonadIO m, MonadBaseControl IO m) =>
+beamInsertOnNoConflict :: (FromBackendRow Pg.Postgres (table Identity), Beamable table, Monad m, MonadIO m, MonadBaseControl IO m) =>
     PGS.Connection
     -> DatabaseEntity Pg.Postgres db (TableEntity table)
     -> (forall s'. table (QExpr Pg.Postgres s'))
     -> m ()
-insertOnNoConflict conn tbl val = do
+beamInsertOnNoConflict conn tbl val = do
     _ <- Pg.runInsertReturning conn (Pg.insertReturning tbl (insertExpressions [val]) (Pg.onConflict Pg.anyConflict Pg.onConflictDoNothing) (Just id)) conduitRight
     return ()
 
--- insertOrGet2 :: (HasSqlEqualityCheck Pg.PgExpressionSyntax proj, FromBackendRow Pg.Postgres (table Identity), Database Pg.Postgres be, Table table, Beamable table, Monad m, MonadIO m, MonadBaseControl IO m) =>
+-- beamInsertOrGet2 :: (HasSqlEqualityCheck Pg.PgExpressionSyntax proj, FromBackendRow Pg.Postgres (table Identity), Database Pg.Postgres be, Table table, Beamable table, Monad m, MonadIO m, MonadBaseControl IO m) =>
 --     PGS.Connection
 --     -> DatabaseEntity Pg.Postgres be (TableEntity table)
 --     -> (forall s'. table (QExpr Pg.PgExpressionSyntax s'))
 --     -> (_ -> QExpr Pg.PgExpressionSyntax s proj)
 --     -> m (table Identity)
--- insertOrGet2 conn tbl val confFields = insertOrGet conn tbl val (\t -> confFields t ==. confFields val)
+-- beamInsertOrGet2 conn tbl val confFields = beamInsertOrGet conn tbl val (\t -> confFields t ==. confFields val)
 
 data RowOperation = RowExisted | RowInserted
 
 -- | Returns the first row that passes the supplied condition if it exists or inserts the new object and returns it while also returning if the row returned already existed or if it's recently inserted.
-insertOrGet :: PgBeam table m db =>
+beamInsertOrGet :: PgBeam table m db =>
     PGS.Connection
     -> DatabaseEntity Pg.Postgres db (TableEntity table)
     -> (forall s'. table (QExpr Pg.Postgres s'))
     -> (table (QExpr Pg.Postgres QBaseScope) -> QExpr Pg.Postgres QBaseScope Bool)
     -> m (table Identity, RowOperation)
-insertOrGet conn tbl val confFields = do
-    retMaybe <- liftIO $ Pg.runBeamPostgresDebug putStrLn conn $ runSelectReturningOne $ select $ filter_ confFields $ all_ tbl
+beamInsertOrGet conn tbl val confFields = do
+    retMaybe <- liftIO $ Pg.runBeamPostgres conn $ runSelectReturningOne $ select $ filter_ confFields $ all_ tbl
     case retMaybe of
         Just ret -> return (ret, RowExisted)
         Nothing  -> do
-            row <- insertReturningOrThrow conn tbl val
+            row <- beamInsertReturningOrThrow conn tbl val
             return (row, RowInserted)
 
-insertOrGet_ :: PgBeam table m db =>
+beamInsertOrGet_ :: PgBeam table m db =>
     PGS.Connection
     -> DatabaseEntity Pg.Postgres db (TableEntity table)
     -> (forall s'. table (QExpr Pg.Postgres s'))
     -> (table (QExpr Pg.Postgres QBaseScope) -> QExpr Pg.Postgres QBaseScope Bool)
     -> m (table Identity)
-insertOrGet_ conn tbl val confFields = fst <$> insertOrGet conn tbl val confFields
+beamInsertOrGet_ conn tbl val confFields = fst <$> beamInsertOrGet conn tbl val confFields
+
+-- | Apenas uma simplificação para deletar mais facilmente
+beamDelete :: PgBeam table m db =>
+    PGS.Connection
+    -> DatabaseEntity Pg.Postgres db (TableEntity table)
+    -> (forall s. (forall s'. table (QExpr Pg.Postgres s')) -> QExpr Pg.Postgres s Bool)
+    -> m ()
+beamDelete conn tbl whereCond = liftIO . Pg.runBeamPostgres conn . runDelete $ delete tbl whereCond

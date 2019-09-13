@@ -1,0 +1,1 @@
+alter table statusdownloaddiario drop column terminodownload;

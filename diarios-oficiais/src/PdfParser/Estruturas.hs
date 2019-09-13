@@ -5,7 +5,7 @@ import qualified RIO.Text as Text
 import qualified RIO.List as List
 import Data.Char (isDigit)
 import qualified Text.RE.TDFA.Text as RE
-import Data.List.NonEmpty (NonEmpty(..), (<|))
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as Text (splitOn, breakOn)
 import Data.Bifunctor
 import Data.String.Conv
@@ -163,6 +163,11 @@ avgFilter f cond l = case filter cond (catMaybes $ toList (fmap f l)) of
     [] -> Nothing
     (x:xs) -> Just $ uncurry (/) $ List.foldl' (\(num, den) n -> (num + n, den + 1)) (x,1) xs
 
+avg :: (Real a, Fractional b, Foldable t) => t a -> Maybe b
+avg l = case toList l of
+    [] -> Nothing
+    (x:xs) -> Just $ uncurry (\n d -> realToFrac n / d) $ List.foldl' (\(num, den) n -> (num + n, den + 1)) (x,1) xs
+
 -- | Retorna um documento detalhado a partir de suas páginas
 detalharDocumento :: [Page] -> DocumentoDetalhado
 detalharDocumento pgs = 
@@ -208,14 +213,17 @@ detalharPagina (pageBlocos -> blocos) =
         mediaAlturaLinha :: Float
         mediaAlturaLinha = fromMaybe (2 * tamanhoMedioFonte) $ avgFilter (\(Bloco a1 _, Bloco a2 _) -> realToFrac <$> ((-) <$> top a2 <*> top a1)) (\t -> t > 0 && t <= 2 * tamanhoMedioFonte) $ List.zip blocos (List.drop 1 blocos)
         
-        -- 1. Primeiro separamos em colunas
+        snoc :: a -> NonEmpty a -> NonEmpty a
+        snoc v (x :| xs) = x :| xs ++ [v]
+        
+        -- -- 1. Primeiro separamos em colunas. Isso é útil por conta de detecção de larguras
         blocosPorColuna :: [NonEmpty Bloco]
         blocosPorColuna = case blocos of
             [] -> []
             (x:xs) ->
                 let
                     (_, colunaFinal, outrasColunas) =
-                        List.foldr (\bAtual@(Bloco a2 _) (Bloco a1 _, ultimaColuna, demaisColunas) ->
+                        List.foldl' (\(Bloco a1 _, ultimaColuna, demaisColunas) bAtual@(Bloco a2 _) ->
                             let
                                 diferencaAltura = realToFrac <$> ((-) <$> top a2 <*> top a1)
                                 diferencaLateral :: Maybe Float = realToFrac <$> ((-) <$> left a2 <*> left a1)
@@ -223,18 +231,16 @@ detalharPagina (pageBlocos -> blocos) =
                                 provavelmenteMesmaColuna = ((quatroQuintosCompLinha >) . realToFrac <$> diferencaLateral) == Just True
                             in
                                 if provavelmenteAbaixoDoAnterior && provavelmenteMesmaColuna then
-                                    (bAtual, bAtual <| ultimaColuna, demaisColunas)
+                                    (bAtual, snoc bAtual ultimaColuna, demaisColunas)
                                 else
-                                    (bAtual, bAtual :| [], ultimaColuna : demaisColunas)
+                                    (bAtual, bAtual :| [], demaisColunas <> [ultimaColuna])
                                 )
                             (x, x :| [], [])
                             xs
                 in
                     outrasColunas <> [colunaFinal]
 
-        -- 2. Depois 
-        -- TODO: Um parágrafo pode dobrar a coluna. Neste caso temos que nos basear em coisas como a largura da última linha da coluna (ou melhor: se termina com ponto final) para saber
-        --       se o parágrafo terminou na coluna ou continuou na outra.. fica pra outra hora
+        -- 2. Queremos a separação por parágrafos
         paragrafos :: [[Paragrafo]]
         paragrafos = fmap mp blocosPorColuna
             where
@@ -242,7 +248,10 @@ detalharPagina (pageBlocos -> blocos) =
                 adicionarLineBreakAoUltimoTel :: [TextEl] -> [TextEl]
                 adicionarLineBreakAoUltimoTel [] = []
                 adicionarLineBreakAoUltimoTel (ultimoTel : []) = case ultimoTel of
-                    TextEl attrs (Left t) -> [ TextEl attrs $ Left (t <> "\n") ]
+                    TextEl attrs (Left t) ->
+                        if RE.anyMatches (t RE.*=~ [RE.re|- *\n?$|]) 
+                            then [ TextEl attrs $ Left (t RE.?=~/ [RE.ed|- *\n?$///|]) ]
+                            else [ TextEl attrs $ Left (t <> " ") ]
                     TextEl attrs (Right tels) -> [ TextEl attrs $ Right (adicionarLineBreakAoUltimoTel tels) ]
                 adicionarLineBreakAoUltimoTel (t:ts) = t : adicionarLineBreakAoUltimoTel ts
 
@@ -251,36 +260,39 @@ detalharPagina (pageBlocos -> blocos) =
                 textElsRaizDoBlocoComLineBreak (Bloco _ (Right blcs)) = concatMap textElsRaizDoBlocoComLineBreak blcs
 
                 mp :: NonEmpty Bloco -> [Paragrafo]
-                mp blocosDaColuna@(x :| xs) =
+                mp bs@(x :| xs) =
                     let
-                        -- TODO: Ideal seria analisar distribuição de valores e pegar média daqueles entre +- 2 sigma ao invés de fazer média simples
-                        offsetLeftColunaMedio = avgFilter (fmap realToFrac . left . atributosBloco) (const True) blocosDaColuna
+                        -- Pegamos offset left médio a partir apenas de 1/3 dos blocos para evitar os centralizados de nos atrapalharem
+                        offsetLeftColunaMedio :: Maybe Float
+                        offsetLeftColunaMedio = avg $ List.take (floor ((realToFrac (RIO.length bs) :: Float) / 3)) $ List.sort $ catMaybes $ toList $ fmap (left . atributosBloco) bs
                         alinhamentoBloco :: Bloco -> AlinhamentoTexto
-                        alinhamentoBloco (Bloco attrs _) = 
+                        alinhamentoBloco b@(Bloco attrs _) = 
                             let
                                 offsetLateralBloco = (-) <$> fmap realToFrac (left attrs) <*> offsetLeftColunaMedio
                                 maisQue2CharsAfastado = ((2 * tamanhoMedioFonte <) <$> offsetLateralBloco) == Just True
+                                alig = if maisQue2CharsAfastado then Centralizado else AEsquerda
                             in
-                                if maisQue2CharsAfastado then Centralizado else AEsquerda
+                                if RE.anyMatches (textoBloco b RE.*=~[RE.re| *JONAS DONIZETTE *\n?$|]) then traceShow (offsetLateralBloco, offsetLeftColunaMedio, textoBloco b) alig else alig
                         
                         (_, ultimoParagrafo, paragrafosAnteriores) =
-                            List.foldr (\bAtual@(Bloco a2 _) (bAnterior@(Bloco a1 _), pEmConstrucao@(Paragrafo alPConstr telsPConstr), todosPs) ->
+                            List.foldl' (\(bAnterior@(Bloco a1 _), pEmConstrucao@(Paragrafo alPConstr telsPConstr), todosPs) bAtual@(Bloco a2 _) ->
                                 let
                                     textoBlocoAnterior = textoBloco bAnterior
                                     diferencaAltura = realToFrac <$> ((-) <$> top a2 <*> top a1)
                                     separadosPorMuitaAltura = ((2 * mediaAlturaLinha <) <$> diferencaAltura) == Just True
                                     -- comprimentoLinhaAnterior = realToFrac (Text.length textoBlocoAnterior) * tamanhoMedioFonte
-                                    anteriorTerminaComPonto = RE.anyMatches (textoBlocoAnterior RE.*=~ [RE.re|(\.|;)\s*\n|])
+                                    anteriorTerminaComPonto = RE.anyMatches (textoBlocoAnterior RE.*=~ [RE.re|(\.|;) *\n?$|])
+                                    anteriorTerminaComHifen = RE.anyMatches (textoBlocoAnterior RE.*=~ [RE.re|- *\n?$|])
                                     -- linhaAnteriorCurta = mediaComprimentoLinha - comprimentoLinhaAnterior >= tamanhoMedioFonte * 60
                                     alinhamentoTexto = alinhamentoBloco bAtual
 
                                     -- anteriorTerminaComPonto não é bom critério. Exemplo: "Dr. Mário Gatti" com "Dr." no final de uma linha..
                                     -- Parece que lidar com n-grams é inevitável
                                 in
-                                    if separadosPorMuitaAltura || anteriorTerminaComPonto || alPConstr /= alinhamentoTexto then
-                                        (bAtual, Paragrafo alinhamentoTexto (textElsRaizDoBlocoComLineBreak bAtual), pEmConstrucao : todosPs)
+                                    if not anteriorTerminaComHifen && (separadosPorMuitaAltura || anteriorTerminaComPonto || alPConstr /= alinhamentoTexto) then
+                                        (bAtual, Paragrafo alinhamentoTexto (textElsRaizDoBlocoComLineBreak bAtual), todosPs <> [pEmConstrucao])
                                     else
-                                        (bAtual, Paragrafo alPConstr (textElsRaizDoBlocoComLineBreak bAtual <> telsPConstr), todosPs))
+                                        (bAtual, Paragrafo alPConstr (telsPConstr <> textElsRaizDoBlocoComLineBreak bAtual), todosPs))
                                 (x, Paragrafo (alinhamentoBloco x) (textElsRaizDoBlocoComLineBreak x), [])
                                 xs
                     in
@@ -290,6 +302,7 @@ detalharPagina (pageBlocos -> blocos) =
 
 -- PARTE 3: Separação em Seções. A ideia é que cada Seção seja a menor unidade possível que trate de um tema específico, mas o mais importante agora
 --          é apenas que Seções diferentes não possuam conteúdo do mesmo tópico e que sejam pequenas o suficiente para caberem num TSVECTOR do postgres
+-- NOTA: A SEPARAÇÃO EM SEÇÕES JÁ NÃO É IMPORTANTE. A BUSCA ACONTECE NOS PARÁGRAFOS. AQUI PODERÍAMOS
 
 data Secao = Secao { secaoConteudo :: [Paragrafo] }
 printSecao :: Secao -> Text
@@ -300,13 +313,14 @@ obterSecoes doc =
     let
         todosPs = concatMap paginaParagrafos (documentoPaginas doc)
         tamanhoFonteSecao = 1.5 * (documentoTamanhoMedioFonte doc)
+        -- TODO: Parágrafos podem dobrar páginas
     in
         case todosPs of
             [] -> []
             (x:xs) ->
                 let
                     (ultimaSecao, outrasSecoes) =
-                        List.foldr (\p (secaoEmConstrucao@(Secao psConstrucao), outrasSecoes) ->
+                        List.foldl' (\(secaoEmConstrucao@(Secao psConstrucao), demaisSecoes) p ->
                             let
                                 qtdPsSecao = List.length psConstrucao
                                 tamanhoFonteP = fromMaybe 9 $ tamanhoMedioFonteParagrafo p
@@ -315,9 +329,9 @@ obterSecoes doc =
                                 fonteGigante = tamanhoFonteP > 4 * tamanhoFonteSecao -- Fonte gigante provavelmente significa cabeçalho de página, não início de seção
                             in
                                 if qtdPsSecao == 1 || tamanhoFonteP < tamanhoFonteSecao || not fonteMuitoMaiorQueUltimoP || fonteGigante then
-                                    (Secao (p : psConstrucao), outrasSecoes)
+                                    (Secao (psConstrucao <> [p]), demaisSecoes)
                                 else
-                                    (Secao [p], secaoEmConstrucao : outrasSecoes))
+                                    (Secao [p], demaisSecoes <> [secaoEmConstrucao]))
                         (Secao [x], [])
                         xs
                 in

@@ -2,21 +2,9 @@ module PdfParser where
 
 import RIO
 import qualified Data.Text as T
-import Data.List
-import System.Process.Typed
-import Data.String.Conv
 import qualified PdfParser.HtmlParser as PP
 import qualified PdfParser.Estruturas as PP
 import qualified Data.Char as C
-
-parsePdfAntigo :: [FilePath] -> IO T.Text
-parsePdfAntigo pdfFilePaths = do
-    conteudoPaginas <- forM pdfFilePaths $ \path -> do
-        (_, texto, _) <- readProcess (shell $ "pdftotext -enc UTF-8 " ++ path ++ " -")
-        -- TODO: Se exitCode errado throw!
-        return texto
-    let linhasDasPaginas = concatMap (T.lines . toS) conteudoPaginas
-    return $ unirLinhas linhasDasPaginas
 
 parsePdfEmSecoes :: (MonadUnliftIO m, MonadIO m) => [FilePath] -> m [PP.Secao]
 parsePdfEmSecoes pdfFilePaths = do
@@ -62,6 +50,3 @@ withMax f xs = snd <$> maybeRes
   where maybeRes = foldl' (\acc el -> case acc of
                                         Just (maxVal, _) -> let cmp = f el in if cmp > maxVal then Just (cmp, el) else acc
                                         Nothing              -> Just (f el, el)) Nothing xs
-
-median :: Ord a => [a] -> Maybe a
-median = fmap head . withMax length . group . sort

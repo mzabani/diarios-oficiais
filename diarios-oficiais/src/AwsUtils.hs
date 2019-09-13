@@ -1,13 +1,16 @@
 module AwsUtils where
 
+import qualified RIO.ByteString as B
 import Aws
+import qualified Data.Attoparsec.ByteString.Char8 as Parsec
 
--- | Retorna a configuração Amazon do usuário IAM "diarios-fetcher", que possui as permissões necessárias pra esta aplicação funcionar.
+-- | Retorna a configuração Amazon do usuário IAM com as permissões necessárias pra esta aplicação funcionar.
+-- TODO: Ainda não usamos a Amazon.. usar o S3 para armazenar os diários em PDF seria ótimo
 createAwsConfiguration :: IO Configuration
 createAwsConfiguration = do
-    -- TODO: No futuro não deixar chaves no código, mas carregá-las do disco (outros devs não terão acesso às chaves desta forma!)
-    let accessKeyId = "AKIAJIKUJ5C4VQ3SMB7Q"
-    let secretKey = "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"
+    chavesCsv <- B.readFile "./keys/aws-IAM-diarios-fetcher-accessKeys.csv"
+    let [accessKeyId, secretKey] = either (error "Erro ao parsear o que deveria ser um arquivo de uma linha com chaves AWS separadas por vírgula") id $
+                                        Parsec.parseOnly (Parsec.sepBy Parsec.takeByteString (Parsec.char ',') <* Parsec.endOfInput) chavesCsv
     creds <- makeCredentials accessKeyId secretKey
     return Configuration {
         timeInfo = Timestamp

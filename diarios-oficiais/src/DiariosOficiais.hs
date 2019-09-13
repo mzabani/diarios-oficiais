@@ -65,8 +65,7 @@ start = do
   let mgrSettings = Http.tlsManagerSettings { Http.managerModifyRequest = \req -> return req { requestHeaders = [("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36")] } }
   mgr <- newManager mgrSettings
   bracket (createDbPool 1 60 50) destroyAllResources $ \dbPool -> do
-    homeDir <- getHomeDirectory
-    let basePath = homeDir </> "Diarios/"
+    let basePath = "./data/diarios-oficiais/"
     createDirectoryIfMissing False basePath
     awsConfig <- createAwsConfiguration
     let ctx = AppContext {
@@ -107,14 +106,14 @@ downloadEIndexar hj AppContext{..} sub = do
           diarioExistenteMaybe <- getDiarioNaData (crawlerOrigemDiarioId sub) hj conn
           diarioExistente <- case diarioExistenteMaybe of
                                 Just d  -> return d
-                                Nothing -> insertReturningOrThrow conn (diarios diariosDb) Diario {
+                                Nothing -> beamInsertReturningOrThrow conn (diarios diariosDb) Diario {
                                             diarioId = default_,
                                             diarioOrigemDiarioId = val_ $ crawlerOrigemDiarioId sub,
                                             diarioNome = val_ "",
                                             diarioData = val_ hj
                                           }
           rightNow <- utcNow
-          insertReturningOrThrow conn (diariosABaixar diariosDb) DiarioABaixar {
+          beamInsertReturningOrThrow conn (diariosABaixar diariosDb) DiarioABaixar {
             diarioabaixarId = default_,
             diarioabaixarDiarioId = val_ $ pk diarioExistente,
             diarioabaixarInicioDownload = val_ rightNow
@@ -123,7 +122,7 @@ downloadEIndexar hj AppContext{..} sub = do
         downloads <- forM (Prelude.zip [1..] links) $ \(ordem, l) -> do
           downloadStart <- utcNow
           statusDownload <- withDbTransaction conn $
-                              insertReturningOrThrow conn (statusDownloads diariosDb)
+                              beamInsertReturningOrThrow conn (statusDownloads diariosDb)
                                               StatusDownloadDiario {
                                                   statusdownloaddiarioId = default_,
                                                   statusdownloaddiarioDiarioABaixarId = val_ $ primaryKey diarioABaixar,
@@ -135,7 +134,7 @@ downloadEIndexar hj AppContext{..} sub = do
           (pdfFilePath, md5) <- downloadToAsMd5 l basePath mgr
           downloadEnd <- utcNow
           withDbTransaction conn $
-            insertOrThrow conn (downloadsTerminados diariosDb) DownloadTerminado {
+            beamInsertOrThrow conn (downloadsTerminados diariosDb) DownloadTerminado {
               downloadterminadoId = default_,
               downloadterminadoStatusDownloadDiarioId = val_ $ primaryKey statusDownload,
               downloadterminadoMomentoTermino = val_ downloadEnd,
@@ -152,37 +151,27 @@ downloadEIndexar hj AppContext{..} sub = do
             conteudoMd5Sum = hash ((toS conteudoTextoPdf) :: ByteString) :: Digest MD5
             md5sumString   = show conteudoMd5Sum
             paragrafosDiario = RIO.concatMap PP.secaoConteudo secoesPdf
-        writeFileUtf8 (basePath </> md5sumString <.> ".txt") conteudoTextoPdf
+        -- writeFileUtf8 (basePath </> md5sumString <.> ".txt") conteudoTextoPdf
         conteudoDiario <- withDbTransaction conn $ do
-          conteudoDiario <- insertOrGet_ conn (conteudosDiarios diariosDb) ConteudoDiario {
+          conteudoDiario <- beamInsertOrGet_ conn (conteudosDiarios diariosDb) ConteudoDiario {
             conteudodiarioId = default_,
-            conteudodiarioConteudo = val_ conteudoTextoPdf,
             conteudodiarioMd5Sum = val_ $ toS md5sumString
           } (\t -> conteudodiarioMd5Sum t ==. val_ (toS md5sumString))
-          insertOrThrow conn (diariosABaixarToConteudosDiarios diariosDb) DiarioABaixarToConteudoDiario {
+          beamInsertOrThrow conn (diariosABaixarToConteudosDiarios diariosDb) DiarioABaixarToConteudoDiario {
             diarioabaixartoconteudodiarioId = default_,
             diarioabaixartoconteudodiarioDiarioABaixarId = val_ $ pk diarioABaixar,
             diarioabaixartoconteudodiarioConteudoDiarioId = val_ $ pk conteudoDiario
           }
           return conteudoDiario
 
-        -- -- TODO: Se as Seções forem muito grandes.. o trecho abaixo jogará uma exceção. Precisamos
-        -- -- capturar e precisamos de um Fallback (quem sabe páginas?)
-        -- withDbTransaction conn $
-        --   forM_ (RIO.zip [0..] secoesPdfEmTexto) $ \(i, textoSecao) -> do
-        --     -- TODO: insertOnConflictUpdate
-        --     insertOnNoConflict conn (secoesDiarios diariosDb) SecaoDiario {
-        --       secaodiarioId = default_,
-        --       secaodiarioConteudoDiarioId = val_ $ pk conteudoDiario,
-        --       secaodiarioOrdem = val_ i,
-        --       secaodiarioConteudo = val_ textoSecao
-        --     }
+        -- TODO: Tudo daqui pra baixo deveria ser uma função separada para que possa ser executada
+        -- para diários antigos quando introduzimos novidades (e.g. mais tokens buscáveis)
         
-        withDbTransaction conn $ do
-          -- TODO: insertOnConflictUpdate ao invés de insertOnNoConflict e apagar apenas parágrafos com ordem maior que o último (código comentado mais abaixo)
-          -- runDelete $ delete (paragrafosDiarios diariosDb) (\pd -> paragrafodiarioConteudoDiarioId pd ==. val_ (pk conteudoDiario))
+        withDbTransaction_ conn $ do
+          -- TODO: insertOnConflictUpdate ao invés de beamInsertOnNoConflict e apagar apenas parágrafos com ordem maior que o último (código comentado mais abaixo)
+          beamDelete conn (paragrafosDiarios diariosDb) (\pd -> paragrafodiarioConteudoDiarioId pd ==. val_ (pk conteudoDiario))
           forM_ (RIO.zip [0..] paragrafosDiario) $ \(i, paragrafo) -> do
-            insertOnNoConflict conn (paragrafosDiarios diariosDb) ParagrafoDiario {
+            beamInsertOnNoConflict conn (paragrafosDiarios diariosDb) ParagrafoDiario {
               paragrafodiarioId = default_,
               paragrafodiarioConteudoDiarioId = val_ $ pk conteudoDiario,
               paragrafodiarioOrdem = val_ i,
@@ -191,18 +180,14 @@ downloadEIndexar hj AppContext{..} sub = do
           -- let ordemUltimoParagrafo = RIO.length paragrafosDiario - 1
           -- runDelete $ delete (paragrafosDiarios diariosDb) (\pd -> paragrafodiarioOrdem pd >. ordemUltimoParagrafo &&. paragrafodiarioConteudoDiarioId ==. pk conteudoDiario)
 
-        -- TODO: Tudo daqui pra baixo deveria ser uma função separada para que possa ser executada
-        -- para diários antigos quando introduzimos novidades (e.g. mais tokens buscáveis)
-        let docDiario@(DocumentoDiario tokensEPosicoes) = parseConteudoDiario conteudoTextoPdf
+          let (DocumentoDiario tokensEPosicoes) = parseConteudoDiario conteudoTextoPdf
         
-        -- Inserção de tokens buscáveis de todos tipos que nos interessarem
-        withDbTransaction conn $ do
-          -- TODO: DELETE!
-          -- runDelete $ delete (tokensTextoTbl diariosDb) (\tt -> tokentextoConteudoDiarioId tt ==. val_ (pk conteudoDiario))
+          -- Inserção de tokens buscáveis de todos tipos que nos interessarem
+          beamDelete conn (tokensTextoTbl diariosDb) (\tt -> tokentextoConteudoDiarioId tt ==. val_ (pk conteudoDiario))
           forM_ tokensEPosicoes $ \(pos, token) ->
             case token of
               TokenCpf (cpfTexto, cpf) ->
-                insertOnNoConflict conn (tokensTextoTbl diariosDb) Model.Diarios.TokenTexto {
+                beamInsertOnNoConflict conn (tokensTextoTbl diariosDb) Model.Diarios.TokenTexto {
                   tokentextoId = default_,
                   tokentextoValorTexto = val_ (printCpfSoNumeros cpf),
                   tokentextoConteudoDiarioId = val_ $ pk conteudoDiario,
@@ -212,7 +197,7 @@ downloadEIndexar hj AppContext{..} sub = do
                 }
 
               TokenCnpj (cnpjTexto, cnpj) ->
-                insertOnNoConflict conn (tokensTextoTbl diariosDb) Model.Diarios.TokenTexto {
+                beamInsertOnNoConflict conn (tokensTextoTbl diariosDb) Model.Diarios.TokenTexto {
                   tokentextoId = default_,
                   tokentextoValorTexto = val_ (printCnpjSoNumeros cnpj),
                   tokentextoConteudoDiarioId = val_ $ pk conteudoDiario,

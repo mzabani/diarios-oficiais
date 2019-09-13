@@ -12,7 +12,7 @@ ghcid-backend:
 	ghcid -W -c "cabal new-repl backend" -T Main.main
 
 ghcid-diarios:
-	ghcid -W -c "cabal new-repl diarios-oficiais-exe"
+	ghcid -W -c "cabal new-repl diarios-oficiais"
 
 hoogle:
 	hoogle server --local --port=8080

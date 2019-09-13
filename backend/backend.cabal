@@ -54,6 +54,7 @@ executable backend
                      , reflex-dom
                      , time
                      , wai-cors
+                     , attoparsec
 
   hs-source-dirs:      src
   default-language:    Haskell2010

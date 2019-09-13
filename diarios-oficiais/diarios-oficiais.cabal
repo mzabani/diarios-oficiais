@@ -31,10 +31,10 @@ library
                      , PdfParser
                      , Buscador
                      , AwsUtils
-                     , PdfParser.PandocHtmlParser
                      , PdfParser.DocumentoParserInteligente
                      , PdfParser.Estruturas
                      , PdfParser.HtmlParser
+                     , AwsUtils
   build-depends:       base >= 4.7 && < 5
                      , bytestring
                      , rio
@@ -65,8 +65,6 @@ library
                      , attoparsec
                      , aws
                      , mime-mail
-                     , pandoc
-                     , pandoc-types
                      , data-default
                      , edit-distance
                      , regex
