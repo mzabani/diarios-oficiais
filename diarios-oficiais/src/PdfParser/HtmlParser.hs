@@ -17,8 +17,8 @@ import Text.XML.Cursor
 import Text.XML
 import qualified Text.HTML.DOM as HTML
 
-parsePdf :: (MonadIO m, MonadUnliftIO m) => [FilePath] -> m (Either () [Secao])
-parsePdf pdfFilePaths = do
+parsePdfDetalhado :: (MonadIO m, MonadUnliftIO m) => [FilePath] -> m (Either () (InfoDocumento, [BlocoEInfo]))
+parsePdfDetalhado pdfFilePaths = do
     someRandomNumber :: Int <- liftIO randomIO
     allPages <-
         forM pdfFilePaths $ \pdfPath -> do
@@ -41,10 +41,17 @@ parsePdf pdfFilePaths = do
     case sequenceA (mconcat allPages) of
         Left err -> return $ Left err
         Right pgs -> do
-            let doc = detalharDocumento pgs
-                secoesDoc = obterSecoes doc
-            
-            return (Right secoesDoc)
+            let doc = produzirDadosCompletos pgs
+            return (Right doc)
+
+parsePdf :: (MonadIO m, MonadUnliftIO m) => [FilePath] -> m (Either () [Paragrafo])
+parsePdf pdfFilePaths = do
+    parseRes <- parsePdfDetalhado pdfFilePaths
+    case parseRes of
+        Left () -> return (Left ())
+        Right (docInfo, binfos) -> do
+            let matchings = mkMatching (docInfo, binfos)
+            return $ Right $ mkParagrafos binfos matchings
 
 divListToPage :: [Element] -> Page
 divListToPage blocks' = 

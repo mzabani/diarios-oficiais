@@ -10,10 +10,12 @@ import UnliftIO.Environment
 import Data.Time
 import Data.Pool
 import qualified Database.PostgreSQL.Simple as PGS
+import qualified Data.ByteString.Lazy as LBS
 import Control.Monad.Trans.Resource
 import System.Directory
 import Crypto.Hash
 import Crypto.Hash.Conduit
+import qualified System.Process.Typed as Process
 import qualified Network.HTTP.Client as Http
 import qualified Network.HTTP.Client.TLS as Http
 import System.FilePath
@@ -22,7 +24,7 @@ import Data.Conduit.Binary
 import Data.String.Conv
 import Database.Beam
 import Network.HTTP.Conduit
-import qualified PdfParser as PP
+import qualified PdfParser.HtmlParser as PP
 import qualified PdfParser.Estruturas as PP
 import Buscador
 import AwsUtils
@@ -31,6 +33,7 @@ import qualified Data.Foldable as Fold
 import qualified Crawlers.Campinas as CrawlerCampinas
 import qualified Crawlers.Sumare as CrawlerSumare
 import qualified Data.Text as T
+import qualified Data.Aeson as Aeson
 
 allCrawlers :: [Crawler]
 allCrawlers = [toCrawler CrawlerSumare.SumareCrawler, toCrawler CrawlerCampinas.CampinasCrawler]
@@ -59,6 +62,14 @@ downloadToAsMd5 url dir mgr = do
       return (finalPath, fileHash)
   where sinkHandleAndClose handle' = sinkIOHandle (return handle')
 
+
+-- | Não achei um loop como esse nem em monad-loops... :(
+forMUntilNothing :: Monad m => [a] -> (a -> m (Maybe b)) -> m [b]
+forMUntilNothing [] _ = return []
+forMUntilNothing (x:xs) f = f x >>= \case
+                                      Nothing -> return []
+                                      Just v  -> (v :) <$> forMUntilNothing xs f
+
 start :: IO ()
 start = do
   putStrLn "Passe a opção \"fetch\" para baixar todos os diários dos últimos 365 dias e não passe opção nenhuma para baixar continuamente diários"
@@ -81,6 +92,38 @@ start = do
         forM_ [0..365] $ \i -> do
           let dt = addDays ((-1) * i) hj
           Fold.forM_ allCrawlers $ \sub -> downloadEIndexar dt ctx sub
+      [ "treinar", pdfFile ] -> do
+        let fullPath = "data/diarios-oficiais" </> pdfFile
+            resultadoPath = "treinamento" </> pdfFile <.> "json"
+        (infoDoc, binfos) <- either (error "Oops") id <$> PP.parsePdfDetalhado [fullPath]
+        whenM (liftIO $ doesFileExist resultadoPath) $ do
+          resultadoEsperadoAtual <- fromMaybe (error "JSON inválido!") <$> Aeson.decodeFileStrict resultadoPath
+          let matchingsAlgo = PP.mkMatching (infoDoc, binfos)
+              acuracia = PP.matchingAccuracy matchingsAlgo resultadoEsperadoAtual
+          liftIO $ putStrLn $ "Acurácia de matching do algoritmo atual: " <> show acuracia
+
+        matchingEsperado <- Process.withProcess (Process.shell $ "evince \"" ++ fullPath ++ "\" &") $ \_ ->
+          forMUntilNothing binfos $ \binfo -> do
+            let readMatch = liftIO getLine >>= \case
+                                                        "m" -> return $ Just PP.DoMesmoParagrafo
+                                                        "i" -> return $ Just PP.IniciaOutroParagrafo
+                                                        "c" -> return $ Just PP.Cabecalho
+                                                        "s" -> return Nothing
+                                                        _   -> readMatch
+            
+            liftIO $ putStrLn "Bloco:"
+            liftIO $ putStrLn $ T.unpack $ PP.infoTexto binfo
+            liftIO $ putStrLn "-------------"
+            liftIO $ putStrLn "Digite \"m\" se este bloco pertence ao Mesmo parágrafo do anterior, \"i\" para IniciaOutroParagrafo e \"c\" para Cabecalho. Digite \"s\" para sair salvando o progresso até então."
+            readMatch
+        
+        
+        liftIO $ putStrLn $ "Digite \"salvar\" para escrever este arquivo em disco em " <> resultadoPath
+        cmd <- liftIO getLine
+        when (cmd == "salvar") $ do
+          RIO.writeFileBinary resultadoPath $ LBS.toStrict $ Aeson.encode matchingEsperado
+          liftIO $ putStrLn $ "Arquivo com resultado esperado escrito em " <> resultadoPath
+        return ()
       _ ->
         forever $ do
           forM_ allCrawlers $ downloadEIndexar hj ctx
@@ -143,14 +186,13 @@ downloadEIndexar hj AppContext{..} sub = do
             }
           return pdfFilePath
 
-        secoesPdf <- PP.parsePdfEmSecoes downloads
+        paragrafosDiario <- either (error "Erro de parsing!") id <$> PP.parsePdf downloads
 
         -- Aqui pegamos um md5sum de todo o conteúdo. Podemos pegar diretamente de "conteudoTextoPdf" pois aí mudanças
         -- no conversor pdf -> texto irão ativar o código de mudança de conteúdo que vem depois
-        let conteudoTextoPdf = T.concat $ fmap PP.printSecao secoesPdf
+        let conteudoTextoPdf = T.concat $ fmap PP.printParagrafo paragrafosDiario
             conteudoMd5Sum = hash ((toS conteudoTextoPdf) :: ByteString) :: Digest MD5
             md5sumString   = show conteudoMd5Sum
-            paragrafosDiario = RIO.concatMap PP.secaoConteudo secoesPdf
         -- writeFileUtf8 (basePath </> md5sumString <.> ".txt") conteudoTextoPdf
         conteudoDiario <- withDbTransaction conn $ do
           conteudoDiario <- beamInsertOrGet_ conn (conteudosDiarios diariosDb) ConteudoDiario {

@@ -28,7 +28,6 @@ library
                      , DiariosOficiais.Crawling
                      , Crawlers.Campinas
                      , Crawlers.Sumare
-                     , PdfParser
                      , Buscador
                      , AwsUtils
                      , PdfParser.DocumentoParserInteligente
@@ -70,6 +69,7 @@ library
                      , regex
                      , random
                      , unliftio
+                     , aeson
   default-language:    Haskell2010
   ghc-options:        -Wno-simplifiable-class-constraints
   default-extensions: OverloadedStrings
@@ -90,6 +90,8 @@ library
                     , ScopedTypeVariables
                     , LambdaCase
                     , AllowAmbiguousTypes
+                    , TupleSections
+                    , TypeApplications
 
 executable diarios-oficiais-exe
   hs-source-dirs:      app

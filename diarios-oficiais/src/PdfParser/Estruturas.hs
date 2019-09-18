@@ -5,10 +5,12 @@ import qualified RIO.Text as Text
 import qualified RIO.List as List
 import Data.Char (isDigit)
 import qualified Text.RE.TDFA.Text as RE
-import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as Text (splitOn, breakOn)
 import Data.Bifunctor
 import Data.String.Conv
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty (NonEmpty(..))
+import Data.Aeson (ToJSON, FromJSON)
 
 -- PARTE 1: Tipos que representam blocos, elementos inline e seus tamanhos de fonte/posição left e top
 
@@ -130,19 +132,8 @@ corpoPaginaDebug (pageBlocos -> blocos) = Text.concat $ fmap printBlocoDebug blo
 
 -- PARTE 2: Tipos que representam o documento após processamento dos dados de altura e posição horizontal para obter informações
 --          mais processadas como alinhamento de texto e se onde começam e terminam parágrafos
-data DocumentoDetalhado = DocumentoDetalhado {
-    documentoTamanhoMedioFonte :: Float,
-    documentoPaginas :: [PaginaDetalhada]
-}
-data PaginaDetalhada = PaginaDetalhada {
-    paginaTamanhoMedioFonte :: Float,
-    paginaParagrafos :: [Paragrafo]
-}
 data AlinhamentoTexto = AEsquerda | Centralizado deriving (Show, Eq)
-data Paragrafo = Paragrafo AlinhamentoTexto [TextEl] deriving Show
-
-alinhamentoParagrafo :: Paragrafo -> AlinhamentoTexto
-alinhamentoParagrafo (Paragrafo al _) = al
+newtype Paragrafo = Paragrafo [TextEl] deriving Show
 
 todosTextElsDoTextEl :: TextEl -> [TextEl]
 todosTextElsDoTextEl tel = case texto tel of
@@ -150,13 +141,13 @@ todosTextElsDoTextEl tel = case texto tel of
     Right tels -> concatMap todosTextElsDoTextEl tels
 
 tamanhoMedioFonteParagrafo :: Paragrafo -> Maybe Float
-tamanhoMedioFonteParagrafo (Paragrafo _ tels) = avgFilter (fontSize . atributos) (const True) tels
+tamanhoMedioFonteParagrafo (Paragrafo tels) = avgFilter (fontSize . atributos) (const True) tels
 
 printParagrafoDebug :: Paragrafo -> Text
-printParagrafoDebug (Paragrafo align tels) = "\n                      " <> Text.pack (show align) <> "\n" <> Text.concat (fmap printTxtElDebug tels)
+printParagrafoDebug (Paragrafo tels) = "\n                      " <> Text.concat (fmap printTxtElDebug tels)
 
 printParagrafo :: Paragrafo -> Text
-printParagrafo (Paragrafo _ tels) = Text.concat (fmap printTxtEl tels)
+printParagrafo (Paragrafo tels) = Text.concat (fmap printTxtEl tels)
 
 avgFilter :: (Fractional a, Foldable t, Functor t) => (b -> Maybe a) -> (a -> Bool) -> t b -> Maybe a
 avgFilter f cond l = case filter cond (catMaybes $ toList (fmap f l)) of
@@ -168,25 +159,39 @@ avg l = case toList l of
     [] -> Nothing
     (x:xs) -> Just $ uncurry (\n d -> realToFrac n / d) $ List.foldl' (\(num, den) n -> (num + n, den + 1)) (x,1) xs
 
--- | Retorna um documento detalhado a partir de suas páginas
-detalharDocumento :: [Page] -> DocumentoDetalhado
+data BlocoEInfo = BlocoEInfo {
+    infoBloco :: Bloco
+    , infoTexto :: Text
+    , infoTerminaComHifen :: Bool
+    , infoTerminaComPontoOuPontoEVirgula :: Bool
+    , infoPagina :: Int
+    , infoIndexNaPagina :: Int
+    , infoColuna :: Int
+} deriving Show
+
+data InfoDocumento = InfoDocumento {
+    docTamanhoMedioFonte :: Float
+    , docMediaAlturaLinha :: Float
+} deriving Show
+
+-- | Retorna os parágrafos todos separadinhos a partir das páginas
+detalharDocumento :: [Page] -> [Paragrafo]
 detalharDocumento pgs = 
+    let 
+        (docInfo, binfos) = produzirDadosCompletos pgs
+        matchings = mkMatching (docInfo, binfos)
+    in mkParagrafos binfos matchings
+    
+produzirDadosCompletos :: [Page] -> (InfoDocumento, [BlocoEInfo])
+produzirDadosCompletos pgs = 
     let
-        -- TODO: Por hora calculamos uma média das médias de cada página para a fonte e não uma média geral do documento..
-        pgsDetalhadas = fmap detalharPagina pgs
+        blocosEPgs = concatMap (\(pg, ordemPg) -> fmap (, ordemPg) (pageBlocos pg)) (zip pgs [0..])
     in
-    DocumentoDetalhado {
-        documentoTamanhoMedioFonte = fromMaybe 9 $ avgFilter (Just . paginaTamanhoMedioFonte) (const True) pgsDetalhadas,
-        documentoPaginas = pgsDetalhadas
-    }
+    produzirBlocosEInfo blocosEPgs
 
-
--- | Retorna os parágrafos da página de forma aproximada
-detalharPagina :: Page -> PaginaDetalhada
-detalharPagina (pageBlocos -> blocos) = 
-    -- -- Assim que a altura cair por mais de 5 elementos consecutivos e subir novamente para um bloco posicionado o suficiente à esquerda, temos a mudança de coluna
-    -- Colunas são formadas por blocos consecutivos cujo "left" é próximo o suficiente comparado ao tamanho médio das linhas da página
-    -- IMPORTANTE: O posicionamento suficiente à esquerda é importante por conta de tabelas, já que a ordem dos blocos em tabelas é por coluna e não por linha.. cuidado!
+-- | Retorna os parágrafos da página de forma aproximada recebendo blocos e suas páginas
+produzirBlocosEInfo :: [(Bloco, Int)] -> (InfoDocumento, [BlocoEInfo])
+produzirBlocosEInfo blocosEPgs = 
     let
         todosTextElsDoBloco :: Bloco -> [TextEl]
         todosTextElsDoBloco (Bloco _ (Left tels)) = concatMap todosTextElsDoTextEl tels
@@ -201,6 +206,8 @@ detalharPagina (pageBlocos -> blocos) =
 
         todosBlocosDaPagina :: [Bloco]
         todosBlocosDaPagina = concatMap todosBlocosDoBloco blocos
+
+        blocos = fmap fst blocosEPgs
         
         -- TODO: Ideal seria analisar distribuição de valores e pegar média daqueles entre +- 2 sigma ao invés de fazer filtros arbitrários (e.g. <= 24)
         --       Nosso algoritmo para "tamanhoMedioFonte" falha se a fonte for muito grande, por exemplo (e aí todo o resto falha junto)
@@ -213,126 +220,152 @@ detalharPagina (pageBlocos -> blocos) =
         mediaAlturaLinha :: Float
         mediaAlturaLinha = fromMaybe (2 * tamanhoMedioFonte) $ avgFilter (\(Bloco a1 _, Bloco a2 _) -> realToFrac <$> ((-) <$> top a2 <*> top a1)) (\t -> t > 0 && t <= 2 * tamanhoMedioFonte) $ List.zip blocos (List.drop 1 blocos)
         
-        snoc :: a -> NonEmpty a -> NonEmpty a
-        snoc v (x :| xs) = x :| xs ++ [v]
-        
-        -- -- 1. Primeiro separamos em colunas. Isso é útil por conta de detecção de larguras
-        blocosPorColuna :: [NonEmpty Bloco]
-        blocosPorColuna = case blocos of
+        -- Construímos BlocoEInfo numa única passada
+        mkBlocoEInfo :: Bloco -> Int -> Int -> Int -> BlocoEInfo
+        mkBlocoEInfo b pg pgIdx col = BlocoEInfo {
+            infoBloco = b
+            , infoTexto = textoBloco b
+            , infoTerminaComHifen = RE.anyMatches (textoBloco b RE.*=~ [RE.re|- *\n?$|])
+            , infoTerminaComPontoOuPontoEVirgula = RE.anyMatches (textoBloco b RE.*=~ [RE.re|(\.|;) *\n?$|])
+            , infoPagina = pg
+            , infoIndexNaPagina = pgIdx
+            , infoColuna = col
+        }
+        blocosInfos :: [BlocoEInfo]
+        blocosInfos = case blocosEPgs of
             [] -> []
-            (x:xs) ->
-                let
-                    (_, colunaFinal, outrasColunas) =
-                        List.foldl' (\(Bloco a1 _, ultimaColuna, demaisColunas) bAtual@(Bloco a2 _) ->
-                            let
-                                diferencaAltura = realToFrac <$> ((-) <$> top a2 <*> top a1)
-                                diferencaLateral :: Maybe Float = realToFrac <$> ((-) <$> left a2 <*> left a1)
-                                provavelmenteAbaixoDoAnterior = ((negate mediaAlturaLinha <) <$> diferencaAltura) == Just True
-                                provavelmenteMesmaColuna = ((quatroQuintosCompLinha >) . realToFrac <$> diferencaLateral) == Just True
-                            in
-                                if provavelmenteAbaixoDoAnterior && provavelmenteMesmaColuna then
-                                    (bAtual, snoc bAtual ultimaColuna, demaisColunas)
-                                else
-                                    (bAtual, bAtual :| [], demaisColunas <> [ultimaColuna])
-                                )
-                            (x, x :| [], [])
-                            xs
-                in
-                    outrasColunas <> [colunaFinal]
-
-        -- 2. Queremos a separação por parágrafos
-        paragrafos :: [[Paragrafo]]
-        paragrafos = fmap mp blocosPorColuna
-            where
-                -- TODO: Unir hífens no fim de TextEl com o TextEl da próxima linha
-                adicionarLineBreakAoUltimoTel :: [TextEl] -> [TextEl]
-                adicionarLineBreakAoUltimoTel [] = []
-                adicionarLineBreakAoUltimoTel (ultimoTel : []) = case ultimoTel of
-                    TextEl attrs (Left t) ->
-                        if RE.anyMatches (t RE.*=~ [RE.re|- *\n?$|]) 
-                            then [ TextEl attrs $ Left (t RE.?=~/ [RE.ed|- *\n?$///|]) ]
-                            else [ TextEl attrs $ Left (t <> " ") ]
-                    TextEl attrs (Right tels) -> [ TextEl attrs $ Right (adicionarLineBreakAoUltimoTel tels) ]
-                adicionarLineBreakAoUltimoTel (t:ts) = t : adicionarLineBreakAoUltimoTel ts
-
-                textElsRaizDoBlocoComLineBreak :: Bloco -> [TextEl]
-                textElsRaizDoBlocoComLineBreak (Bloco _ (Left tels)) = adicionarLineBreakAoUltimoTel tels
-                textElsRaizDoBlocoComLineBreak (Bloco _ (Right blcs)) = concatMap textElsRaizDoBlocoComLineBreak blcs
-
-                mp :: NonEmpty Bloco -> [Paragrafo]
-                mp bs@(x :| xs) =
+            ((b1, _):xs) -> snd $
+                List.foldl' (\(ultimoBInfo, todosBInfos) (bAtual, pgAtual) ->
                     let
-                        -- Pegamos offset left médio a partir apenas de 1/3 dos blocos para evitar os centralizados de nos atrapalharem
-                        offsetLeftColunaMedio :: Maybe Float
-                        offsetLeftColunaMedio = avg $ List.take (floor ((realToFrac (RIO.length bs) :: Float) / 3)) $ List.sort $ catMaybes $ toList $ fmap (left . atributosBloco) bs
-                        alinhamentoBloco :: Bloco -> AlinhamentoTexto
-                        alinhamentoBloco b@(Bloco attrs _) = 
-                            let
-                                offsetLateralBloco = (-) <$> fmap realToFrac (left attrs) <*> offsetLeftColunaMedio
-                                maisQue2CharsAfastado = ((2 * tamanhoMedioFonte <) <$> offsetLateralBloco) == Just True
-                                alig = if maisQue2CharsAfastado then Centralizado else AEsquerda
-                            in
-                                if RE.anyMatches (textoBloco b RE.*=~[RE.re| *JONAS DONIZETTE *\n?$|]) then traceShow (offsetLateralBloco, offsetLeftColunaMedio, textoBloco b) alig else alig
+                        a2 = atributosBloco bAtual
+                        a1 = atributosBloco (infoBloco ultimoBInfo)                        
+                        mesmaPagina = pgAtual == infoPagina ultimoBInfo
                         
-                        (_, ultimoParagrafo, paragrafosAnteriores) =
-                            List.foldl' (\(bAnterior@(Bloco a1 _), pEmConstrucao@(Paragrafo alPConstr telsPConstr), todosPs) bAtual@(Bloco a2 _) ->
-                                let
-                                    textoBlocoAnterior = textoBloco bAnterior
-                                    diferencaAltura = realToFrac <$> ((-) <$> top a2 <*> top a1)
-                                    separadosPorMuitaAltura = ((2 * mediaAlturaLinha <) <$> diferencaAltura) == Just True
-                                    -- comprimentoLinhaAnterior = realToFrac (Text.length textoBlocoAnterior) * tamanhoMedioFonte
-                                    anteriorTerminaComPonto = RE.anyMatches (textoBlocoAnterior RE.*=~ [RE.re|(\.|;) *\n?$|])
-                                    anteriorTerminaComHifen = RE.anyMatches (textoBlocoAnterior RE.*=~ [RE.re|- *\n?$|])
-                                    -- linhaAnteriorCurta = mediaComprimentoLinha - comprimentoLinhaAnterior >= tamanhoMedioFonte * 60
-                                    alinhamentoTexto = alinhamentoBloco bAtual
-
-                                    -- anteriorTerminaComPonto não é bom critério. Exemplo: "Dr. Mário Gatti" com "Dr." no final de uma linha..
-                                    -- Parece que lidar com n-grams é inevitável
-                                in
-                                    if not anteriorTerminaComHifen && (separadosPorMuitaAltura || anteriorTerminaComPonto || alPConstr /= alinhamentoTexto) then
-                                        (bAtual, Paragrafo alinhamentoTexto (textElsRaizDoBlocoComLineBreak bAtual), todosPs <> [pEmConstrucao])
-                                    else
-                                        (bAtual, Paragrafo alPConstr (telsPConstr <> textElsRaizDoBlocoComLineBreak bAtual), todosPs))
-                                (x, Paragrafo (alinhamentoBloco x) (textElsRaizDoBlocoComLineBreak x), [])
-                                xs
+                        diferencaAltura = realToFrac <$> ((-) <$> top a2 <*> top a1)
+                        diferencaLateral :: Maybe Float = realToFrac <$> ((-) <$> left a2 <*> left a1)
+                        provavelmenteAbaixoDoAnterior = ((negate mediaAlturaLinha <) <$> diferencaAltura) == Just True
+                        provavelmenteMesmaColuna = ((quatroQuintosCompLinha >) . realToFrac <$> diferencaLateral) == Just True
+                        mesmaColuna = provavelmenteAbaixoDoAnterior && provavelmenteMesmaColuna && pgAtual == infoIndexNaPagina ultimoBInfo
+                        colIdx = if not mesmaPagina then 0
+                                   else if mesmaColuna then infoColuna ultimoBInfo
+                                   else infoColuna ultimoBInfo + 1
+                        pgIdx = if mesmaPagina then infoIndexNaPagina ultimoBInfo + 1
+                                else 0
+                        bAtualInfo = mkBlocoEInfo bAtual pgAtual pgIdx colIdx
                     in
-                        paragrafosAnteriores <> [ultimoParagrafo]
+                        (bAtualInfo, todosBInfos <> [bAtualInfo])
+                    )
+                    (mkBlocoEInfo b1 0 0 0, [ mkBlocoEInfo b1 0 0 0 ])
+                    xs
+
     in
-        PaginaDetalhada { paginaTamanhoMedioFonte = tamanhoMedioFonte, paginaParagrafos = mconcat paragrafos }
+        (InfoDocumento {
+            docTamanhoMedioFonte = tamanhoMedioFonte
+            , docMediaAlturaLinha = mediaAlturaLinha
+        }, blocosInfos)
 
--- PARTE 3: Separação em Seções. A ideia é que cada Seção seja a menor unidade possível que trate de um tema específico, mas o mais importante agora
---          é apenas que Seções diferentes não possuam conteúdo do mesmo tópico e que sejam pequenas o suficiente para caberem num TSVECTOR do postgres
--- NOTA: A SEPARAÇÃO EM SEÇÕES JÁ NÃO É IMPORTANTE. A BUSCA ACONTECE NOS PARÁGRAFOS. AQUI PODERÍAMOS
+-- Nosso algoritmo compara pares de blocos consecutivos, e para cada comparação retorna um `Matching`
+data Matching = DoMesmoParagrafo | Cabecalho | IniciaOutroParagrafo deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
-data Secao = Secao { secaoConteudo :: [Paragrafo] }
-printSecao :: Secao -> Text
-printSecao (secaoConteudo -> ps) = Text.concat $ fmap printParagrafo ps
-
-obterSecoes :: DocumentoDetalhado -> [Secao]
-obterSecoes doc = 
+mkMatching :: (InfoDocumento, [BlocoEInfo]) -> [Matching]
+mkMatching (InfoDocumento {..}, binfos) =
     let
-        todosPs = concatMap paginaParagrafos (documentoPaginas doc)
-        tamanhoFonteSecao = 1.5 * (documentoTamanhoMedioFonte doc)
-        -- TODO: Parágrafos podem dobrar páginas
-    in
-        case todosPs of
+        -- Pegamos offset left médio a partir apenas os 1/3 menores (em offset) blocos para evitar os centralizados de nos atrapalharem
+        offsetLeftMedioPorColuna :: [(Int, Float)]
+        offsetLeftMedioPorColuna = fmap (\l@((col, _) :| _) ->
+            let 
+                todos = fmap snd l
+                umTercoMenores = NE.take (ceiling @Float (realToFrac (NE.length todos) / 3)) todos
+            in (col, fromMaybe 0 $ avg umTercoMenores)) $ NE.groupWith fst $ catMaybes $ fmap (\bi -> (,) (infoColuna bi) <$> left (atributosBloco (infoBloco bi))) binfos
+        
+        alinhamentoBloco :: BlocoEInfo -> AlinhamentoTexto
+        alinhamentoBloco b = 
+            let
+                offsetLeftColunaMedio = lookup (infoColuna b) offsetLeftMedioPorColuna
+                attrs = atributosBloco (infoBloco b)
+                offsetLateralBloco = (-) <$> fmap realToFrac (left attrs) <*> offsetLeftColunaMedio
+                maisQue2CharsAfastado = ((2 * docTamanhoMedioFonte <) <$> offsetLateralBloco) == Just True
+                alig = if maisQue2CharsAfastado then Centralizado else AEsquerda
+            in
+                --if RE.anyMatches (infoTexto b RE.*=~[RE.re| *JONAS DONIZETTE *\n?$|]) then traceShow (offsetLateralBloco, offsetLeftColunaMedio, infoTexto b) alig else alig
+                alig
+
+    in case binfos of
             [] -> []
-            (x:xs) ->
-                let
-                    (ultimaSecao, outrasSecoes) =
-                        List.foldl' (\(secaoEmConstrucao@(Secao psConstrucao), demaisSecoes) p ->
-                            let
-                                qtdPsSecao = List.length psConstrucao
-                                tamanhoFonteP = fromMaybe 9 $ tamanhoMedioFonteParagrafo p
-                                tamanhoFonteUltimoP = fromMaybe 9 $ avgFilter tamanhoMedioFonteParagrafo (< tamanhoFonteSecao) psConstrucao
-                                fonteMuitoMaiorQueUltimoP = tamanhoFonteP - tamanhoFonteUltimoP >= 1
-                                fonteGigante = tamanhoFonteP > 4 * tamanhoFonteSecao -- Fonte gigante provavelmente significa cabeçalho de página, não início de seção
-                            in
-                                if qtdPsSecao == 1 || tamanhoFonteP < tamanhoFonteSecao || not fonteMuitoMaiorQueUltimoP || fonteGigante then
-                                    (Secao (psConstrucao <> [p]), demaisSecoes)
+            [ _ ] -> [ IniciaOutroParagrafo ] -- Caso bizarro..
+            _ -> fmap (\(bAnteriorInfo, bAtualInfo) ->
+                        let
+                            a1 = atributosBloco (infoBloco bAnteriorInfo)
+                            a2 = atributosBloco (infoBloco bAtualInfo)
+                            
+                            
+                            diferencaAltura = realToFrac <$> ((-) <$> top a2 <*> top a1)
+                            separadosPorMuitaAltura = ((2 * docMediaAlturaLinha <) <$> diferencaAltura) == Just True
+                            -- comprimentoLinhaAnterior = realToFrac (Text.length textoBlocoAnterior) * tamanhoMedioFonte
+                            anteriorTerminaComPonto = infoTerminaComPontoOuPontoEVirgula bAnteriorInfo
+                            anteriorTerminaComHifen = infoTerminaComHifen bAnteriorInfo
+                            -- linhaAnteriorCurta = mediaComprimentoLinha - comprimentoLinhaAnterior >= tamanhoMedioFonte * 60
+                            alinhamentoTexto = alinhamentoBloco bAtualInfo
+                            alinhamentoAnterior = alinhamentoBloco bAnteriorInfo
+
+                            -- anteriorTerminaComPonto não é bom critério. Exemplo: "Dr. Mário Gatti" com "Dr." no final de uma linha..
+                            -- Parece que lidar com n-grams é inevitável
+                        in
+                            if not anteriorTerminaComHifen && (separadosPorMuitaAltura || anteriorTerminaComPonto || alinhamentoAnterior /= alinhamentoTexto) then
+                                IniciaOutroParagrafo
+                            else
+                                DoMesmoParagrafo
+                        )
+                    (zip binfos (drop 1 binfos))
+
+-- | Conta, comparando apenas os matchings disponíveis em ambas as listas (e desconsiderando excessos)
+--   a quantidade de Blocos que pertencem aos mesmos parágrafos dividido pelo total de blocos.
+--   Em caso de alguma lista de matchings ser vazia, retorna 0.
+matchingAccuracy :: [Matching] -> [Matching] -> Float
+matchingAccuracy ms1 ms2 =
+    let (_, _, tb, tdiff) = foldl' (\(idxPar1 :: Int, idxPar2, totalBlocos :: Int, totalBlocosEmParasDiferentes :: Int) (m1, m2) ->
+                                        let
+                                            novoIdxPar1 = if m1 == DoMesmoParagrafo then idxPar1 else idxPar1 + 1
+                                            novoIdxPar2 = if m2 == DoMesmoParagrafo then idxPar2 else idxPar2 + 1
+                                        in
+                                        (novoIdxPar1, novoIdxPar2, totalBlocos + 1, if novoIdxPar1 == novoIdxPar2 then totalBlocosEmParasDiferentes else totalBlocosEmParasDiferentes + 1))
+                                    (-1, -1, 0, 0)
+                                    (zip ms1 ms2)
+    in if tb == 0 then 0 else 1 - realToFrac tdiff / realToFrac tb
+
+-- | Retorna os parágrafos da página de forma aproximada
+mkParagrafos :: [BlocoEInfo] -> [Matching] -> [Paragrafo]
+mkParagrafos binfos matchings =
+    if length binfos /= length matchings
+        then error "Comprimentos dos matchings e binfos não bate! Queria que essa verificação fosse em tempo de compilação mas deixa pra outra hora.."
+        else 
+            case zip binfos matchings of
+                [] -> []
+                ((b1, _):xs) -> 
+                    let
+                        adicionarLineBreakAoUltimoTel :: [TextEl] -> [TextEl]
+                        adicionarLineBreakAoUltimoTel [] = []
+                        adicionarLineBreakAoUltimoTel (ultimoTel : []) = case ultimoTel of
+                            TextEl attrs (Left t) ->
+                                if RE.anyMatches (t RE.*=~ [RE.re|- *\n?$|]) 
+                                    then [ TextEl attrs $ Left (t RE.?=~/ [RE.ed|- *\n?$///|]) ]
+                                    else [ TextEl attrs $ Left (t <> " ") ]
+                            TextEl attrs (Right tels) -> [ TextEl attrs $ Right (adicionarLineBreakAoUltimoTel tels) ]
+                        adicionarLineBreakAoUltimoTel (t:ts) = t : adicionarLineBreakAoUltimoTel ts
+    
+                        textElsRaizDoBlocoComLineBreak :: Bloco -> [TextEl]
+                        textElsRaizDoBlocoComLineBreak (Bloco _ (Left tels)) = adicionarLineBreakAoUltimoTel tels
+                        textElsRaizDoBlocoComLineBreak (Bloco _ (Right blcs)) = concatMap textElsRaizDoBlocoComLineBreak blcs
+                        
+                        (ultimoParagrafo, paragrafosAnteriores) =
+                            List.foldl' (\(pEmConstrucao@(Paragrafo telsPConstr), todosPs) (bAtualInfo, matching) ->
+                                let bAtual = infoBloco bAtualInfo
+                                in
+                                if matching == Cabecalho || matching == IniciaOutroParagrafo then
+                                        (Paragrafo (textElsRaizDoBlocoComLineBreak bAtual), todosPs <> [pEmConstrucao])
                                 else
-                                    (Secao [p], demaisSecoes <> [secaoEmConstrucao]))
-                        (Secao [x], [])
-                        xs
-                in
-                    outrasSecoes <> [ultimaSecao]
+                                    (Paragrafo (telsPConstr <> textElsRaizDoBlocoComLineBreak bAtual), todosPs))
+                                (Paragrafo (textElsRaizDoBlocoComLineBreak (infoBloco b1)), [])
+                                xs
+                        in
+                            paragrafosAnteriores <> [ultimoParagrafo]

@@ -71,17 +71,16 @@ htmlBody = do
                             return resultadosDyn
                 
                 divClass "alert alert-warning" $ el "ul" $ do
-                    el "li" $ do
-                        el "ul" $ do
-                            el "li" $ text "Não me responsabilizo pelo conteúdo dos Diários exibidos/buscados. A importação dos Diários é um processo onde partes significativas destes podem se perder ou serem alteradas (e isso realmente acontece com frequência)."
-                            el "li" $ el "strong" (text "Sempre verifique o conteúdo encontrado") >> text " antes de assumir que está encontrando o que pensa estar buscando"
-                            el "li" $ text "O buscador busca parágrafos, mas o que é exatamente um parágrafo aqui pode variar muito, e geralmente não corresponderá ao que humanos entendem por parágrafo"
+                    el "li" $ text "Não me responsabilizo pelo conteúdo dos Diários exibidos/buscados. A importação dos Diários é um processo onde partes significativas destes podem se perder ou serem alteradas (e isso realmente acontece com frequência)."
+                    el "ul" $ do
+                        el "li" $ el "strong" (text "Sempre verifique o conteúdo encontrado") >> text " antes de assumir que está encontrando o que pensa estar buscando"
+                        el "li" $ text "O buscador busca parágrafos, mas o que é exatamente um parágrafo aqui pode variar muito, e geralmente não corresponderá ao que humanos entendem por parágrafo"
                     el "li" $ text "O código deste buscador é aberto. Acesse " >> elAttr "a" ("href" =: "https://github.com/mzabani/diarios-oficiais") (text "https://github.com/mzabani/diarios-oficiais") >> text " para ver."
                     el "li" $ text "Por enquanto apenas o Diário Oficial da cidade de Campinas está disponível, " >> el "strong" (text "em geral") >> text " para os últimos 365 dias"
                     el "li" $ text "Para fins de pesquisa, a busca avançada pode ajudar: tente por exemplo \"boletim de ocorrência grupos:data diario\" para ver o total de exonerações (de forma aproximada) por cidade e data. Mude os grupos (mas use apenas \"data\" e \"diario\") para ver outras métricas"
                     el "ul" $ do
-                        el "li" $ text "Tente também \"habite-se diario:Campinas data>2019-02-01\" para ver parágrafos com \"habite-se\" da cidade de Campinas a partir de 1º de fevereiro de 2019"
-                        el "li" $ text "Tente também \"alvará deferido data>2019-01-01 data<2019-01-31 grupos:data\" para ver alvarás deferidos em todos diários oficiais disponíveis por data no mês de Janeiro/2019"
+                        el "li" $ text "Tente também \"habite-se diario:Campinas data>=2019-02-01\" para ver parágrafos com \"habite-se\" da cidade de Campinas a partir de 1º de fevereiro de 2019"
+                        el "li" $ text "Tente também \"alvará deferido data>=2019-01-01 data<=2019-01-31 grupos:data\" para ver alvarás deferidos em todos diários oficiais disponíveis por data no mês de Janeiro/2019"
                 
                 dyn_ $ ffor resultadosDyn $ \case
                         NadaBuscado -> pure ()
