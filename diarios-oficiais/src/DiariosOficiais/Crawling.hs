@@ -1,10 +1,10 @@
 module DiariosOficiais.Crawling where
 
+import RIO
 import Model.Diarios
 import Data.Time
 import Data.Text
 import Network.HTTP.Client
-import Control.Monad.IO.Class
 
 class IsCrawler c where
     toCrawler :: c -> Crawler
@@ -12,7 +12,7 @@ class IsCrawler c where
 data Crawler = Crawler {
     crawlerNome :: Text,
     crawlerOrigemDiarioId :: OrigemDiarioId,
-    findLinks :: forall m. MonadIO m => Day -> Manager -> m CrawlResult
+    findLinks :: forall m. (MonadIO m, MonadThrow m) => Day -> Manager -> m CrawlResult
 }
 instance Show Crawler where
     show c = unpack $ crawlerNome c

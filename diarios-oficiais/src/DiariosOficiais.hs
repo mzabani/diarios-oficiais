@@ -36,7 +36,9 @@ import qualified Data.Text as T
 import qualified Data.Aeson as Aeson
 
 allCrawlers :: [Crawler]
-allCrawlers = [toCrawler CrawlerSumare.SumareCrawler, toCrawler CrawlerCampinas.CampinasCrawler]
+-- Só Campinas funciona por enquanto
+--allCrawlers = [toCrawler CrawlerSumare.SumareCrawler, toCrawler CrawlerCampinas.CampinasCrawler, toCrawler CrawlersDOU.DOU1Crawler]
+allCrawlers = [toCrawler CrawlerCampinas.CampinasCrawler]
 
 hoje :: MonadIO m => m Day
 hoje = liftIO $ localDay . zonedTimeToLocalTime <$> getZonedTime
@@ -92,6 +94,10 @@ start = do
         forM_ [0..365] $ \i -> do
           let dt = addDays ((-1) * i) hj
           Fold.forM_ allCrawlers $ \sub -> downloadEIndexar dt ctx sub
+
+      [ "reindexar" ] ->
+        error "Precisamos ser capazes de ler os PDFs originais e reinserir os parágrafos deles sem baixá-los dos sites!"
+        
       [ "treinar", pdfFile ] -> do
         let fullPath = "data/diarios-oficiais" </> pdfFile
             resultadoPath = "treinamento" </> pdfFile <.> "json"
@@ -100,9 +106,18 @@ start = do
           resultadoEsperadoAtual <- fromMaybe (error "JSON inválido!") <$> Aeson.decodeFileStrict resultadoPath
           let matchingsAlgo = PP.mkMatching (infoDoc, binfos)
               acuracia = PP.matchingAccuracy matchingsAlgo resultadoEsperadoAtual
+          liftIO $ putStrLn "Matching de algoritmos (atual, desejado):"
+          liftIO $ print $ RIO.zip matchingsAlgo resultadoEsperadoAtual
+          liftIO $ putStrLn ""
           liftIO $ putStrLn $ "Acurácia de matching do algoritmo atual: " <> show acuracia
 
-        matchingEsperado <- Process.withProcess (Process.shell $ "evince \"" ++ fullPath ++ "\" &") $ \_ ->
+        liftIO $ putStrLn "Para cada bloco exibido, digite:"
+        liftIO $ putStrLn "\"m\" se este bloco pertence ao Mesmo parágrafo do anterior"
+        liftIO $ putStrLn "\"i\" para IniciaOutroParagrafo"
+        liftIO $ putStrLn "\"c\" para início de Cabeçalho"
+        liftIO $ putStrLn "\"s\" para sair (a opção de salvar ou não aparecerá em seguida)"
+        liftIO $ putStrLn ""
+        matchingEsperado <- Process.withProcess (Process.shell $ "evince \"" ++ fullPath ++ "\"") $ \_ ->
           forMUntilNothing binfos $ \binfo -> do
             let readMatch = liftIO getLine >>= \case
                                                         "m" -> return $ Just PP.DoMesmoParagrafo
@@ -111,10 +126,8 @@ start = do
                                                         "s" -> return Nothing
                                                         _   -> readMatch
             
-            liftIO $ putStrLn "Bloco:"
             liftIO $ putStrLn $ T.unpack $ PP.infoTexto binfo
-            liftIO $ putStrLn "-------------"
-            liftIO $ putStrLn "Digite \"m\" se este bloco pertence ao Mesmo parágrafo do anterior, \"i\" para IniciaOutroParagrafo e \"c\" para Cabecalho. Digite \"s\" para sair salvando o progresso até então."
+            
             readMatch
         
         
@@ -138,7 +151,7 @@ data AppContext = AppContext {
 }
 
 -- | Baixa o diário e atualiza o banco de dados para torná-lo buscável
-downloadEIndexar :: (MonadUnliftIO m, MonadIO m) => Day -> AppContext -> Crawler -> m ()
+downloadEIndexar :: (MonadThrow m, MonadUnliftIO m, MonadIO m) => Day -> AppContext -> Crawler -> m ()
 downloadEIndexar hj AppContext{..} sub = do
   liftIO $ Prelude.putStrLn $ "Baixando " ++ show sub ++ " da data " ++ show hj
   crawlRes <- findLinks sub hj mgr

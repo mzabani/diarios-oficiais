@@ -28,6 +28,7 @@ library
                      , DiariosOficiais.Crawling
                      , Crawlers.Campinas
                      , Crawlers.Sumare
+                     , Crawlers.DOU1
                      , Buscador
                      , AwsUtils
                      , PdfParser.DocumentoParserInteligente

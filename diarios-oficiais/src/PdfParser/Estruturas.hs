@@ -3,7 +3,7 @@ module PdfParser.Estruturas where
 import RIO
 import qualified RIO.Text as Text
 import qualified RIO.List as List
-import Data.Char (isDigit)
+import Data.Char (isDigit, isLetter, isUpper)
 import qualified Text.RE.TDFA.Text as RE
 import qualified Data.Text as Text (splitOn, breakOn)
 import Data.Bifunctor
@@ -186,13 +186,7 @@ produzirDadosCompletos :: [Page] -> (InfoDocumento, [BlocoEInfo])
 produzirDadosCompletos pgs = 
     let
         blocosEPgs = concatMap (\(pg, ordemPg) -> fmap (, ordemPg) (pageBlocos pg)) (zip pgs [0..])
-    in
-    produzirBlocosEInfo blocosEPgs
 
--- | Retorna os parágrafos da página de forma aproximada recebendo blocos e suas páginas
-produzirBlocosEInfo :: [(Bloco, Int)] -> (InfoDocumento, [BlocoEInfo])
-produzirBlocosEInfo blocosEPgs = 
-    let
         todosTextElsDoBloco :: Bloco -> [TextEl]
         todosTextElsDoBloco (Bloco _ (Left tels)) = concatMap todosTextElsDoTextEl tels
         todosTextElsDoBloco (Bloco _ (Right blcs)) = concatMap todosTextElsDoBloco blcs
@@ -293,11 +287,10 @@ mkMatching (InfoDocumento {..}, binfos) =
     in case binfos of
             [] -> []
             [ _ ] -> [ IniciaOutroParagrafo ] -- Caso bizarro..
-            _ -> fmap (\(bAnteriorInfo, bAtualInfo) ->
+            _ -> Cabecalho : fmap (\(bAnteriorInfo, bAtualInfo) ->
                         let
                             a1 = atributosBloco (infoBloco bAnteriorInfo)
                             a2 = atributosBloco (infoBloco bAtualInfo)
-                            
                             
                             diferencaAltura = realToFrac <$> ((-) <$> top a2 <*> top a1)
                             separadosPorMuitaAltura = ((2 * docMediaAlturaLinha <) <$> diferencaAltura) == Just True
@@ -307,11 +300,29 @@ mkMatching (InfoDocumento {..}, binfos) =
                             -- linhaAnteriorCurta = mediaComprimentoLinha - comprimentoLinhaAnterior >= tamanhoMedioFonte * 60
                             alinhamentoTexto = alinhamentoBloco bAtualInfo
                             alinhamentoAnterior = alinhamentoBloco bAnteriorInfo
+                            
+                            anteriorTudoMaiusculo = Text.all (\c -> not (isLetter c) || isUpper c) (infoTexto bAnteriorInfo)
+                            atualTudoMaiusculo = Text.all (\c -> not (isLetter c) || isUpper c) (infoTexto bAtualInfo)
 
                             -- anteriorTerminaComPonto não é bom critério. Exemplo: "Dr. Mário Gatti" com "Dr." no final de uma linha..
                             -- Parece que lidar com n-grams é inevitável
                         in
-                            if not anteriorTerminaComHifen && (separadosPorMuitaAltura || anteriorTerminaComPonto || alinhamentoAnterior /= alinhamentoTexto) then
+                            -- As regras abaixo são muito específicas para o Diário Oficial de Campinas..
+                            if infoIndexNaPagina bAtualInfo == 0 then
+                                Cabecalho
+                            else if infoPagina bAtualInfo == 0 && infoIndexNaPagina bAtualInfo <= 4 then
+                                DoMesmoParagrafo
+                            else if infoPagina bAtualInfo > 0 && infoIndexNaPagina bAtualInfo <= 3 then
+                                DoMesmoParagrafo
+                            else if infoPagina bAtualInfo == 0 && infoIndexNaPagina bAtualInfo == 5 then
+                                IniciaOutroParagrafo
+                            else if infoPagina bAtualInfo > 0 && infoIndexNaPagina bAtualInfo == 4 then
+                                IniciaOutroParagrafo
+                            else if not anteriorTudoMaiusculo && atualTudoMaiusculo then
+                                IniciaOutroParagrafo
+                            else if anteriorTudoMaiusculo && atualTudoMaiusculo then
+                                DoMesmoParagrafo
+                            else if not anteriorTerminaComHifen && (separadosPorMuitaAltura || anteriorTerminaComPonto || alinhamentoAnterior /= alinhamentoTexto) then
                                 IniciaOutroParagrafo
                             else
                                 DoMesmoParagrafo
@@ -320,9 +331,11 @@ mkMatching (InfoDocumento {..}, binfos) =
 
 -- | Conta, comparando apenas os matchings disponíveis em ambas as listas (e desconsiderando excessos)
 --   a quantidade de Blocos que pertencem aos mesmos parágrafos dividido pelo total de blocos.
+--   Esta função de matching é ruim por ser dura demais. Se a identificação de parágrafos errar um pouco no começo mas entrar em fase
+--   para todo o resto do documento, esta função retornará matching próximo de 0.
 --   Em caso de alguma lista de matchings ser vazia, retorna 0.
-matchingAccuracy :: [Matching] -> [Matching] -> Float
-matchingAccuracy ms1 ms2 =
+matchingAccuracyHard :: [Matching] -> [Matching] -> Float
+matchingAccuracyHard ms1 ms2 =
     let (_, _, tb, tdiff) = foldl' (\(idxPar1 :: Int, idxPar2, totalBlocos :: Int, totalBlocosEmParasDiferentes :: Int) (m1, m2) ->
                                         let
                                             novoIdxPar1 = if m1 == DoMesmoParagrafo then idxPar1 else idxPar1 + 1
@@ -330,6 +343,14 @@ matchingAccuracy ms1 ms2 =
                                         in
                                         (novoIdxPar1, novoIdxPar2, totalBlocos + 1, if novoIdxPar1 == novoIdxPar2 then totalBlocosEmParasDiferentes else totalBlocosEmParasDiferentes + 1))
                                     (-1, -1, 0, 0)
+                                    (zip ms1 ms2)
+    in if tb == 0 then 0 else 1 - realToFrac tdiff / realToFrac tb
+
+matchingAccuracy :: [Matching] -> [Matching] -> Float
+matchingAccuracy ms1 ms2 =
+    let (tb, tdiff) = foldl' (\(totalBlocos :: Int, totalMismatches :: Int) (m1, m2) ->
+                                        (totalBlocos + 1, if m1 == m2 then totalMismatches else totalMismatches + 1))
+                                    (0, 0)
                                     (zip ms1 ms2)
     in if tb == 0 then 0 else 1 - realToFrac tdiff / realToFrac tb
 
@@ -343,29 +364,29 @@ mkParagrafos binfos matchings =
                 [] -> []
                 ((b1, _):xs) -> 
                     let
-                        adicionarLineBreakAoUltimoTel :: [TextEl] -> [TextEl]
-                        adicionarLineBreakAoUltimoTel [] = []
-                        adicionarLineBreakAoUltimoTel (ultimoTel : []) = case ultimoTel of
+                        adicionarEspacoAoUltimoTel :: [TextEl] -> [TextEl]
+                        adicionarEspacoAoUltimoTel [] = []
+                        adicionarEspacoAoUltimoTel (ultimoTel : []) = case ultimoTel of
                             TextEl attrs (Left t) ->
                                 if RE.anyMatches (t RE.*=~ [RE.re|- *\n?$|]) 
                                     then [ TextEl attrs $ Left (t RE.?=~/ [RE.ed|- *\n?$///|]) ]
                                     else [ TextEl attrs $ Left (t <> " ") ]
-                            TextEl attrs (Right tels) -> [ TextEl attrs $ Right (adicionarLineBreakAoUltimoTel tels) ]
-                        adicionarLineBreakAoUltimoTel (t:ts) = t : adicionarLineBreakAoUltimoTel ts
+                            TextEl attrs (Right tels) -> [ TextEl attrs $ Right (adicionarEspacoAoUltimoTel tels) ]
+                        adicionarEspacoAoUltimoTel (t:ts) = t : adicionarEspacoAoUltimoTel ts
     
-                        textElsRaizDoBlocoComLineBreak :: Bloco -> [TextEl]
-                        textElsRaizDoBlocoComLineBreak (Bloco _ (Left tels)) = adicionarLineBreakAoUltimoTel tels
-                        textElsRaizDoBlocoComLineBreak (Bloco _ (Right blcs)) = concatMap textElsRaizDoBlocoComLineBreak blcs
+                        textElsRaizDoBlocoComEspaco :: Bloco -> [TextEl]
+                        textElsRaizDoBlocoComEspaco (Bloco _ (Left tels)) = adicionarEspacoAoUltimoTel tels
+                        textElsRaizDoBlocoComEspaco (Bloco _ (Right blcs)) = concatMap textElsRaizDoBlocoComEspaco blcs
                         
                         (ultimoParagrafo, paragrafosAnteriores) =
                             List.foldl' (\(pEmConstrucao@(Paragrafo telsPConstr), todosPs) (bAtualInfo, matching) ->
                                 let bAtual = infoBloco bAtualInfo
                                 in
                                 if matching == Cabecalho || matching == IniciaOutroParagrafo then
-                                        (Paragrafo (textElsRaizDoBlocoComLineBreak bAtual), todosPs <> [pEmConstrucao])
+                                        (Paragrafo (textElsRaizDoBlocoComEspaco bAtual), todosPs <> [pEmConstrucao])
                                 else
-                                    (Paragrafo (telsPConstr <> textElsRaizDoBlocoComLineBreak bAtual), todosPs))
-                                (Paragrafo (textElsRaizDoBlocoComLineBreak (infoBloco b1)), [])
+                                    (Paragrafo (telsPConstr <> textElsRaizDoBlocoComEspaco bAtual), todosPs))
+                                (Paragrafo (textElsRaizDoBlocoComEspaco (infoBloco b1)), [])
                                 xs
                         in
                             paragrafosAnteriores <> [ultimoParagrafo]

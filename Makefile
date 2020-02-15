@@ -1,5 +1,6 @@
 shell:
 	@rm -f .ghc.environment.*
+	cachix use mzabani
 	nix-shell -A shells.ghc
 
 build-frontend:
@@ -32,3 +33,6 @@ db-update:
 	./scripts/bootstrap-db.sh
 	# TODO: Aplicar todas as migrações numa única transação (aplicação pós-deploy precisa de todas ou o deploy deve falhar)
 	find db-history -name '*.sql' | sort | xargs -L 1 ./scripts/aplicar-migracao.sh
+
+docker:
+	nix-build docker.nix

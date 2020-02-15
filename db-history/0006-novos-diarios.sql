@@ -1,0 +1,1 @@
+insert into origemdiario (id, nomecompleto) values (3, 'Diário Oficial da União - Seção 1');
