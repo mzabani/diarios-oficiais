@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/mzabani/diarios-oficiais.svg?branch=master)](https://travis-ci.com/mzabani/diarios-oficiais)
+
 # Instruções
 
 1. Instale o Nix através do gerenciador de pacotes da sua distribuição ou executando `bash <(curl https://nixos.org/nix/install)`. Não precisa estar como `root` para esta nem nenhuma das etapas.
