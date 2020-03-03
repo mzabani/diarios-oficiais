@@ -1,22 +1,20 @@
-{ reflex-platform ? import ./nix/reflex-platform.git {} }:
+{ reflex-platform ? import ./nix/reflex-platform.git.nix {} }:
 let
-  basePkgs = import ./pkgs-from-json.nix { json = ./nixos-unstable.json; };
-
-  # Essa versão do Beam possui funções regexp do Postgres.. mas fica pra outra hora
-  # beamSrc = basePkgs.fetchFromGitHub {
-  #   owner = "tathougies";
-  #   repo = "beam";
-  #   rev = "24851f0b1203e329a484aeb3503c5372162efabc";
-  #   sha256 = "1zsbi2zamlmfqwgi0jx1j9hayvryvah7i4w1g49nnzblfakysjiy";
-  # };
+  pkgs = import ./nix/nixpkgs.nix {};
+  nixpkgs = pkgs;
 
   extraBuildInputs = [
-    basePkgs.postgresql_11
-    basePkgs.xpdf
-    basePkgs.automake
+    pkgs.postgresql_11
+    pkgs.xpdf
+    pkgs.automake
+    pkgs.docker
   ];
 
-  deriv = reflex-platform.project ({ pkgs, ... }: {
+  reflexProj = reflex-platform.project (reflexAttrs: 
+    let
+      reflexPkgs = reflexAttrs.pkgs;
+    in
+    {
     name = "diarios-oficiais-site";
 
     packages = {
@@ -28,16 +26,11 @@ let
     };
 
     overrides = self: super: {
-      beam-migrate = basePkgs.haskellPackages.beam-migrate;
-      beam-postgres = basePkgs.haskellPackages.beam-postgres;
-      beam-core = basePkgs.haskellPackages.beam-core;
-      regex = basePkgs.haskellPackages.regex;
-      # attoparsec-time-1 = basePkgs.haskell.lib.dontCheck basePkgs.haskellPackages.attoparsec-time-1;
-      # beam-migrate = basePkgs.haskell.lib.dontCheck (self.callCabal2nix "beam-migrate" "${beamSrc}/beam-migrate" {});
-      # beam-postgres = basePkgs.haskell.lib.dontCheck (self.callCabal2nix "beam-postgres" "${beamSrc}/beam-postgres" {});
-      # beam-core = basePkgs.haskell.lib.dontCheck (self.callCabal2nix "beam-core" "${beamSrc}/beam-core" {});
-      # dependent-map = basePkgs.haskellPackages.dependent-map;
-      # dependent-sum = basePkgs.haskellPackages.dependent-sum;
+      # Nosso nixpkgs está com os pacotes que precisamos já definidos através de overlays, mas referenciá-los
+      # aqui não funciona direito por algum motivo..
+      beam-migrate =  reflexPkgs.haskell.lib.doJailbreak (self.callPackage ./nix/haskell/beam-migrate.nix {});
+      beam-postgres = reflexPkgs.haskell.lib.doJailbreak (reflexPkgs.haskell.lib.dontCheck (self.callPackage ./nix/haskell/beam-postgres.nix {}));
+      beam-core =     reflexPkgs.haskell.lib.doJailbreak (self.callPackage ./nix/haskell/beam-core.nix {});
     };
 
     shells = {
@@ -47,12 +40,14 @@ let
   });
 in
   {
-    ghcjs = deriv.ghcjs;
+    ghcjs = reflexProj.ghcjs;
+
+    ghc = reflexProj.ghc;
     
     shells = {
-      ghcjs = deriv.shells.ghcjs;
+      ghcjs = reflexProj.shells.ghcjs;
 
-      ghc = deriv.shells.ghc.overrideAttrs (old: {
+      ghc = reflexProj.shells.ghc.overrideAttrs (old: {
         buildInputs = old.buildInputs ++ extraBuildInputs;
 
         shellHook = ''

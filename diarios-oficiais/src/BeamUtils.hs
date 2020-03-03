@@ -3,6 +3,7 @@ module BeamUtils (beamInsertOrThrow, beamInsertReturningOrThrow, beamInsertOnNoC
 
 import Data.Conduit
 import Database.Beam
+import Control.Monad.Fail (MonadFail)
 import qualified Database.Beam.Postgres as Pg
 import qualified Database.Beam.Postgres.Full as Pg
 import qualified Database.Beam.Postgres.Conduit as Pg
@@ -54,7 +55,7 @@ beamInsertReturningOrThrow conn tbl val =
     --     Nothing  -> error "insertReturning returned Nothing.. impossible (it should throw on conflict or return a newly inserted row)!"
     --     Just ret -> return ret
 
-beamInsertOnNoConflict :: (FromBackendRow Pg.Postgres (table Identity), Beamable table, Monad m, MonadIO m, MonadBaseControl IO m) =>
+beamInsertOnNoConflict :: (FromBackendRow Pg.Postgres (table Identity), Beamable table, Monad m, MonadIO m, MonadBaseControl IO m, MonadFail m) =>
     PGS.Connection
     -> DatabaseEntity Pg.Postgres db (TableEntity table)
     -> (forall s'. table (QExpr Pg.Postgres s'))

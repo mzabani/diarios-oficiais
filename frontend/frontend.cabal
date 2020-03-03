@@ -19,7 +19,7 @@ executable frontend
   main-is:             Main.hs
   -- other-modules:
   -- other-extensions:
-  build-depends:       base >=4.11 && <4.12
+  build-depends:       base >=4.12 && <4.13
                      , common
                      , text
                      , reflex-dom

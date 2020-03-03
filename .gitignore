@@ -4,6 +4,7 @@ frontend-result
 postgres-datadir/
 data/
 keys/
+results/
 
 cabal-dev
 *.o

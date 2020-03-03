@@ -1,2 +1,2 @@
 language: nix
-script: make build-frontend
+script: make setup-cachix && make build-all

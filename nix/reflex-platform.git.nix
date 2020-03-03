@@ -1,10 +1,11 @@
 { bootstrap ? import <nixpkgs> {} }:
 let
+  # Esse é o reflex-platform v0.5.1.0
   reflex-platform = bootstrap.fetchFromGitHub {
     owner = "reflex-frp";
     repo  = "reflex-platform";
-    rev = "716879f16d53c93766e7ed9af17416fccb2edfe1";
-    sha256 = "1mngxa24cfpvxxq4hgh77nw36vny4abl5wi2xmlwpkk25wzm0h0x";
+    rev = "5429278830e1555a577f2550e045ce7f7164aa65";
+    sha256 = "1lp86cgccmim573rarsjny5vh0ygkfp5afq7006li0k9w2sw2d4c";
   };
 in 
   import reflex-platform {}
