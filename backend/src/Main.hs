@@ -35,7 +35,7 @@ singlePageServer :: Pool Connection -> Server SinglePageAPI
 singlePageServer connectionPool = 
                              Busca.buscaPost connectionPool
                         :<|> Ler.lerDiario connectionPool
-                        :<|> serveDirectoryWebApp "html-SPA"
+                        :<|> serveDirectoryWebApp "../results/frontend/bin/frontend.jsexe/"
 
 main :: IO ()
 main = do
