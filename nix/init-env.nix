@@ -7,7 +7,9 @@
             text = ''
                 #!${pkgs.runtimeShell}
                 set -e
+                trap "set +e" 0
                 ${text}
+                set +e
                 '';
             checkPhase = ''
                 ${pkgs.stdenv.shell} -n $out/bin/${name}
