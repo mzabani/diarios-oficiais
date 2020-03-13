@@ -3,7 +3,7 @@ let
     repo = systemPkgs.fetchFromGitHub {
         owner = "NixOS";
         repo = "nixpkgs-channels";
-        rev = "ea79a830dcf9c0059656da7f52835d2663d5c436";
+        rev = "7399c59c4150635b896470078c5f5d18d702061a";
         sha256 = "0vqnfh99358v9ym5z9i3dsfy0l4xxgh9hr278pi1y11gdl092014";
     };
     config = {
@@ -31,7 +31,7 @@ let
         };
     };
 
-in import "${repo}" {
+in import repo {
     inherit config;
     overlays = [ beamOverlay ];
 }

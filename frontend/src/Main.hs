@@ -19,7 +19,7 @@ search querySearchedEv = do
     let buscaIniciadaEv = Buscando <$> querySearchedEv
         resultadosChegaramEv = toBuscaTerminada <$> (decodeXhrResponse <$> responsesEv)
     holdDyn NadaBuscado (leftmost [buscaIniciadaEv, resultadosChegaramEv])
-    where toRequest termo = postJson "/busca" (FormBusca termo)
+    where toRequest termo = postJson "http://127.0.0.1:8080/busca" (FormBusca termo)
           toBuscaTerminada Nothing = BuscaTerminada $ ErroBusca "Aconteceu um erro interno na desserialização. Por favor reporte isso como um Bug."
           toBuscaTerminada (Just res) = BuscaTerminada res
 

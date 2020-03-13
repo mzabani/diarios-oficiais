@@ -15,7 +15,7 @@ NOTA: Ainda não é feito Machine Learning de forma minimamente razoável. Há m
 para fazer algo decente. Por enquanto só é possível ver quanto o algoritmo atual acerta, mas não dá para mudá-lo dinamicamente
 com novos dados. Fora isso o algoritmo atual é um monte de código engessado com algumas heurísticas aparentemente razoáveis.
 
-1. Rode `cabal new-build diarios-oficiais-exe`
-2. Escolha um diário na pasta */data/diarios-oficiais/* pelo nome do arquivo (será um hash como por exemplo *treinamento/fa31183804602c61a084ea3af6727e79*). Se não tiver nenhum, rode `make fetch` e aguarde alguns diários serem baixados.
-3. Rode `cabal new-exec diarios-oficiais-exe -- treinar fa31183804602c61a084ea3af6727e79`
+1. Rode `cabal new-build diarios-fetcher-exe`
+2. Escolha um diário na pasta */data/diarios-fetcher/* pelo nome do arquivo (será um hash como por exemplo *treinamento/fa31183804602c61a084ea3af6727e79*). Se não tiver nenhum, rode `make fetch` e aguarde alguns diários serem baixados.
+3. Rode `cabal new-exec diarios-fetcher-exe -- treinar fa31183804602c61a084ea3af6727e79`
 4. O pdf será convertido e o programa perguntará, para cada bloco, se aquele bloco (um bloco é aproximadamente uma linha do PDF) pertence ao mesmo parágrafo do último bloco analisado, ou se é cabeçalho.  

@@ -4,22 +4,26 @@ let
   nixpkgs = pkgs;
 
   extraBuildInputs = [
-    pkgs.postgresql_11
+    pkgs.postgresql_12
     pkgs.xpdf
     pkgs.automake
     pkgs.docker
+    pkgs.evince
   ];
+
+  init-env = import nix/init-env.nix { inherit pkgs; };
+  postgres-service = import nix/postgres-service.nix { postgres = pkgs.postgresql_12; pgdatadir = "./postgres-datadir"; inherit pkgs; };
 
   reflexProj = reflex-platform.project (reflexAttrs: 
     let
       reflexPkgs = reflexAttrs.pkgs;
     in
     {
-    name = "diarios-oficiais-site";
+    name = "diarios-oficiais";
 
     packages = {
       brdocs = ./brdocs;
-      diarios-oficiais = ./diarios-oficiais;
+      diarios-fetcher = ./diarios-fetcher;
       common = ./common;
       backend = ./backend;
       frontend = ./frontend;
@@ -34,7 +38,7 @@ let
     };
 
     shells = {
-      ghc = ["common" "backend" "frontend" "brdocs" "diarios-oficiais" ];
+      ghc = ["common" "backend" "frontend" "brdocs" "diarios-fetcher" ];
       ghcjs = ["common" "frontend"];
     };
   });
@@ -51,25 +55,8 @@ in
         buildInputs = old.buildInputs ++ extraBuildInputs;
 
         shellHook = ''
-          export PGPORT=5433 # 5432 pode estar sendo usada por algum postgres local
-          export PGDATABASE="diariosoficiais"
-          export PGHOST="127.0.0.1"
-          export PGUSER="diariosapp"
-
-          if [ "$(ls -A postgres-datadir)" ]; then
-            echo Postgres datadir não-vazio. Considerando-o inicializado
-          else
-            initdb --locale=en_US.UTF8 -E UTF8 -U postgres -d postgres-datadir
-          fi
-
-          # TODO: Detectar se postgres se está rodando de forma mais inteligente (com pg_ctl, por exemplo)
-          if [ ! -f postgres-datadir/postmaster.pid ]; then
-                  pg_ctl start -D postgres-datadir -o "-k /tmp/ -e"
-          else
-            echo Postgres já iniciado
-          fi
-
-          echo Postgres rodando na porta $PGPORT. As variáveis de ambiente para usar o psql já foram definidas.
+        . ${init-env}/bin/init-env
+        ${postgres-service}/bin/init-postgres
         '';
       });
     };

@@ -12,7 +12,7 @@ import RIO
 
 getConnString :: MonadIO m => m ConnectInfo
 getConnString = do
-    user <- liftIO $ fromMaybe "diariosapp" <$> lookupEnv "PGUSER"
+    user <- liftIO $ fromMaybe "diariosapp" <$> lookupEnv "PGAPPUSER"
     port <- liftIO $ fromMaybe 5433 . join <$> (fmap readMaybe <$> lookupEnv "PGPORT")
     db <- liftIO $ fromMaybe "diariosoficiais" <$> lookupEnv "PGDATABASE"
     return defaultConnectInfo { connectHost = "localhost", connectUser = user, connectDatabase = db, connectPort = port }

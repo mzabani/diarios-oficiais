@@ -3,4 +3,4 @@ packages:
   backend/
   frontend/
   brdocs/
-  diarios-oficiais/
+  diarios-fetcher/

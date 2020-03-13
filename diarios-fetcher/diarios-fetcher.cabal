@@ -1,7 +1,7 @@
-name:                diarios-oficiais
+name:                diarios-fetcher
 version:             0.1.0.0
 synopsis:            Interface web para fazer fetching e busca de conteúdo em diários oficiais
-homepage:            https://github.com/mzabani/diarios-oficiais#readme
+homepage:            https://github.com/mzabani/diarios-oficiais
 license:             BSD3
 license-file:        LICENSE
 author:              Marcelo Zabani
@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 -- To avoid duplicated efforts in documentation and dealing with the
 -- complications of embedding Haddock markup inside cabal files, it is
 -- common to point users to the README.md file.
-description:         Veja o README no Github em <https://github.com/mzabani/diarios-oficiais#readme>
+description:         Veja o README no Github em <https://github.com/mzabani/diarios-oficiais>
 
 library
   hs-source-dirs:      src
@@ -94,20 +94,20 @@ library
                     , TupleSections
                     , TypeApplications
 
-executable diarios-oficiais-exe
+executable diarios-fetcher-exe
   hs-source-dirs:      app
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N -Wall -Wincomplete-uni-patterns -Wincomplete-record-updates -Wpartial-fields -O2
   build-depends:       base
-                     , diarios-oficiais
+                     , diarios-fetcher
   default-language:    Haskell2010
 
-test-suite diarios-oficiais-test
+test-suite diarios-fetcher-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
   build-depends:       base
-                     , diarios-oficiais
+                     , diarios-fetcher
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 

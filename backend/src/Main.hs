@@ -11,6 +11,7 @@ import GHC.Generics
 import DiariosOficiais.Database (createDbPool)
 import Data.Aeson
 import Database.PostgreSQL.Simple
+import Network.Wai.Middleware.Cors (cors, simpleCorsResourcePolicy, CorsResourcePolicy(..))
 import Data.Pool
 import Data.Maybe
 import Control.Monad.IO.Class
@@ -24,6 +25,7 @@ import Control.Exception.Safe hiding (Handler)
 import qualified Busca as Busca
 import qualified Ler as Ler
 import qualified Common as Common
+import qualified System.IO as IO
 
 type SinglePageAPI = "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON] Common.ResultadoBusca
                 :<|> "ler" :> Capture "conteudoDiarioId" Int :> Get '[HTML] Blaze.Html
@@ -37,7 +39,16 @@ singlePageServer connectionPool =
 
 main :: IO ()
 main = do
+    IO.hSetBuffering IO.stdout IO.NoBuffering
+    IO.hSetBuffering IO.stderr IO.NoBuffering
+
+    let
+        corsResourcePolicy = Just simpleCorsResourcePolicy {
+            corsRequestHeaders = ["Content-Type"]
+        }
+    
     bracket (createDbPool 1 300 10) destroyAllResources $ \connectionPool -> do
+        putStrLn "Inicializando servidor web na porta 8080"
         let api = Proxy :: Proxy SinglePageAPI
-        run 8080 $ serve api (singlePageServer connectionPool)
+        run 8080 $ cors (const corsResourcePolicy) $ serve api (singlePageServer connectionPool)
         destroyAllResources connectionPool

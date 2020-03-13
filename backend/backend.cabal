@@ -41,7 +41,7 @@ executable backend
                      , postgresql-simple
                      , brdocs
                      , shakespeare
-                     , diarios-oficiais
+                     , diarios-fetcher
                      , blaze-html
                      , servant-blaze
                      , lens
