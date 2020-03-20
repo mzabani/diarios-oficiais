@@ -1,5 +1,2 @@
 language: nix
-sudo: required
-services:
-  - docker
-script: make setup-cachix && make build-all
+script: make setup-cachix && make build-backend && make build-frontend && make build-diarios-fetcher
