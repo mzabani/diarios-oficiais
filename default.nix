@@ -8,11 +8,12 @@ let
     pkgs.xpdf
     pkgs.automake
     pkgs.docker
+    pkgs.docker-compose
     pkgs.evince
+    pkgs.gnused
   ];
 
-  init-env = import nix/init-env.nix { inherit pkgs; };
-  postgres-service = import nix/postgres-service.nix { postgres = pkgs.postgresql_12; pgdatadir = "./postgres-datadir"; inherit pkgs; };
+  postgres-service = import nix/postgres-service.nix { postgres = pkgs.postgresql_12; runInBackground=true; inherit pkgs; };
 
   reflexProj = reflex-platform.project (reflexAttrs: 
     let
@@ -55,7 +56,7 @@ in
         buildInputs = old.buildInputs ++ extraBuildInputs;
 
         shellHook = ''
-        . ${init-env}/bin/init-env
+        source scripts/source-env.sh env/development.env
         ${postgres-service}/bin/init-postgres
         '';
       });

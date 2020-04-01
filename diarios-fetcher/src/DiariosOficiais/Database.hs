@@ -15,7 +15,8 @@ getConnString = do
     user <- liftIO $ fromMaybe "diariosapp" <$> lookupEnv "PGAPPUSER"
     port <- liftIO $ fromMaybe 5433 . join <$> (fmap readMaybe <$> lookupEnv "PGPORT")
     db <- liftIO $ fromMaybe "diariosoficiais" <$> lookupEnv "PGDATABASE"
-    return defaultConnectInfo { connectHost = "localhost", connectUser = user, connectDatabase = db, connectPort = port }
+    host <- liftIO $ fromMaybe "postgresql" <$> lookupEnv "PGHOST"
+    return defaultConnectInfo { connectHost = host, connectUser = user, connectDatabase = db, connectPort = port }
 
 createDbPool :: MonadIO m => Int -> NominalDiffTime -> Int -> m (Pool Connection)
 createDbPool numStripes keepUnusedConnFor maxConnsOpenPerStripe = liftIO $ do

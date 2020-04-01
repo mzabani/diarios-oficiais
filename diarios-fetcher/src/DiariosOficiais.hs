@@ -77,8 +77,8 @@ start = do
   putStrLn "Passe a opção \"fetch\" para baixar todos os diários dos últimos 365 dias e não passe opção nenhuma para baixar continuamente diários"
   let mgrSettings = Http.tlsManagerSettings { Http.managerModifyRequest = \req -> return req { requestHeaders = [("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36")] } }
   mgr <- newManager mgrSettings
+  basePath <- fromMaybe "./data/diarios-oficiais/" <$> lookupEnv "DIARIOSDIR"
   bracket (createDbPool 1 60 50) destroyAllResources $ \dbPool -> do
-    let basePath = "./data/diarios-oficiais/"
     createDirectoryIfMissing False basePath
     awsConfig <- createAwsConfiguration
     let ctx = AppContext {
@@ -130,7 +130,6 @@ start = do
             
             readMatch
         
-        
         liftIO $ putStrLn $ "Digite \"salvar\" para escrever este arquivo em disco em " <> resultadoPath
         cmd <- liftIO getLine
         when (cmd == "salvar") $ do
@@ -141,7 +140,7 @@ start = do
         forever $ do
           forM_ allCrawlers $ downloadEIndexar hj ctx
           putStrLn "Diários baixados. Esperando 1 hora para baixar novamente."
-          threadDelay (1000 * 1000 * 60 * 60) -- Wait for 1 hour (threadDelay takes microseconds)
+          threadDelay (1000 * 1000 * 60 * 60) -- Espera 1 hora até tentar de novo
 
 data AppContext = AppContext {
   mgr :: Manager,

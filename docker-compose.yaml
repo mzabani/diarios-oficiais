@@ -1,0 +1,25 @@
+version: '3.0'
+services:
+  diarios-backend:
+    ports:
+      - "8080:8080"
+    env_file:
+      - env/docker.env
+    image: diarios-backend
+    depends_on:
+      - postgresql
+  diarios-fetcher:
+    env_file:
+      - env/docker.env
+    image: diarios-fetcher
+    volumes:
+      - ./data/diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
+      - ./keys:/keys
+    depends_on:
+      - postgresql
+  postgresql:
+    env_file:
+      - env/docker.env
+    image: postgresql
+    volumes:
+      - ./data/postgres-datadir:/home/postgres/postgres-datadir
