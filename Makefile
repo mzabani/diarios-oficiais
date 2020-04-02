@@ -1,6 +1,11 @@
+setup-nix:
+	@echo "Isso irá instalar o Nix se você ainda não o tiver instalado"
+	@(curl --version || echo "Você precisa do curl instalado")
+	nix --version || ((curl -L --proto '=https' --tlsv1.2 https://nixos.org/nix/install | sh); . ~/.nix-profile/etc/profile.d/nix.sh)
+
 setup-cachix:
-	@echo "Isso irá instalar (e sobrepor se você já tiver instalado) o cachix para o seu usuário, além de configurá-lo para usar o mzabani.cachix.org"
-	nix-env -iA cachix -f nix/nixpkgs.nix
+	@echo "Isso irá instalar o cachix para o seu usuário, além de configurá-lo para usar o mzabani.cachix.org"
+	@(cachix --version || nix-env -iA cachix -f nix/nixpkgs.nix)
 	cachix use mzabani
 
 shell:
@@ -19,16 +24,28 @@ build-frontend:
 build-diarios-fetcher:
 	nix-build -o results/diarios-fetcher -A ghc.diarios-fetcher
 
-.PHONY: docker
-docker:
-	nix-build -o results/docker nix/docker.nix
-	@echo "Imagem Docker do backend criada em ./results/docker. Esta imagem inicializa o Fetcher de Diários e o backend do Buscador Web"
+.PHONY: docker-backend
+docker-backend:
+	nix-build -o results/docker-backend nix/docker/diarios-backend.nix
+	docker load -i results/docker-backend
+	@echo "Imagem Docker do backend criada e carregada. Esta imagem inicializa o backend do Buscador Web"
 
-run-docker-postgres:
-	echo "É necessário fazer 'nix-build -o results/postgres-docker; docker load -i results/postgres-docker;' antes"
-	docker run -p 5433:5433 --mount type=bind,source=/home/mzabani/Projects/diarios-oficiais/postgres-datadir,destination=/postgres-datadir -u $(id u) diarios-oficiais-postgres-service
+.PHONY: docker-fetcher
+docker-fetcher:
+	nix-build -o results/docker-fetcher nix/docker/diarios-fetcher.nix
+	docker load -i results/docker-fetcher
+	@echo "Imagem Docker do Fetcher de diários criada e carregada"
 
-build-all: build-backend build-frontend build-diarios-fetcher docker
+.PHONY: docker-postgresql
+docker-postgresql:
+	nix-build -o results/docker-postgresql nix/docker/postgresql.nix
+	docker load -i results/docker-postgresql
+	@echo "Imagem Docker do serviço postgresql criada e carregada. Esta imagem inicializa o PostgreSQL"
+
+.PHONY: docker-all
+docker-all: docker-backend docker-fetcher docker-postgresql
+
+build-all: build-backend build-frontend build-diarios-fetcher
 
 .PHONY: ghcid-frontend
 ghcid-frontend:

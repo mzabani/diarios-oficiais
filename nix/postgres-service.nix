@@ -1,4 +1,4 @@
-{ postgres, pkgs, pgdatadir }:
+{ postgres, pkgs, runInBackground }:
     let
         writeShellScriptInBinFolder = name: text: pkgs.writeTextFile {
             inherit name;
@@ -18,18 +18,31 @@
         
         ls = "${pkgs.coreutils}/bin/ls";
         echo = "${pkgs.coreutils}/bin/echo";
+        sleep = "${pkgs.coreutils}/bin/sleep";
+        cat = "${pkgs.coreutils}/bin/cat";
+        pg_hba_conf = ../conf/postgresql/pg_hba.conf;
+        postgresql_conf = ../conf/postgresql/postgresql.conf;
     in
     writeShellScriptInBinFolder "init-postgres" ''
-if [ "$(${ls} -A ${pgdatadir})" ]; then
+if [ "$(${ls} -A $PGDATA/*)" ]; then
     ${echo} Postgres datadir não-vazio. Considerando-o inicializado
 else
-    ${postgres}/bin/initdb --locale=en_US.UTF8 -E UTF8 -U postgres -d ${pgdatadir}
+    ${postgres}/bin/initdb --locale=C.UTF8 -E UTF8 -U postgres -d $PGDATA
+    ${cat} ${pg_hba_conf} > $PGDATA/pg_hba.conf
+    ${cat} ${postgresql_conf} > $PGDATA/postgresql.conf
 fi
 
-# TODO: Detectar se postgres se está rodando de forma mais inteligente (com pg_ctl, por exemplo)
-if [ ! -f ${pgdatadir}/postmaster.pid ]; then
-    ${postgres}/bin/pg_ctl start -D ${pgdatadir} -p ${postgres}/bin/postgres -o "-k /tmp/ -e -p $PGPORT"
-else
+set +e
+${postgres}/bin/pg_ctl status -D $PGDATA -p ${postgres}/bin/postgres
+PGCTLSTATUS=$?
+set -e
+
+if [ "$PGCTLSTATUS" -eq "0" ]; then
     ${echo} Postgres já iniciado
+else
+    ${postgres}/bin/pg_ctl start -D $PGDATA -p ${postgres}/bin/postgres -o "-k /tmp/ -e -p $PGPORT"
 fi
+
+${if runInBackground then ""
+    else "trap \"${postgres}/bin/pg_ctl stop -D $PGDATA\" 0; ${sleep} infinity;"}
 ''
