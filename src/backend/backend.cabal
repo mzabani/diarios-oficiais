@@ -26,6 +26,8 @@ executable backend
                      , rio
                      , wai
                      , warp
+                     , warp-tls
+                     , directory
                      , servant
                      , servant-server
                      , servant-auth-server

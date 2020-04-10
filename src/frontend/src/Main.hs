@@ -1,3 +1,5 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 import Data.Proxy
 import Control.Lens ((&), (%~), (.~))
 import Reflex.Dom
@@ -11,6 +13,13 @@ import Data.Text (Text)
 import Data.Time.Calendar
 import Control.Monad
 import Common
+import BuildEnv (getCompileEnvExp)
+
+servidor :: Text
+servidor = $(getCompileEnvExp "BACKENDURL")
+
+getUrl :: Text -> Text
+getUrl path = servidor <> path
 
 data Busca = NadaBuscado | Buscando Text | BuscaTerminada ResultadoBusca
 
@@ -19,7 +28,7 @@ search querySearchedEv = do
     let buscaIniciadaEv = Buscando <$> querySearchedEv
         resultadosChegaramEv = toBuscaTerminada <$> (decodeXhrResponse <$> responsesEv)
     holdDyn NadaBuscado (leftmost [buscaIniciadaEv, resultadosChegaramEv])
-    where toRequest termo = postJson "http://127.0.0.1:8080/busca" (FormBusca termo)
+    where toRequest termo = postJson (getUrl "/busca") (FormBusca termo)
           toBuscaTerminada Nothing = BuscaTerminada $ ErroBusca "Aconteceu um erro interno na desserialização. Por favor reporte isso como um Bug."
           toBuscaTerminada (Just res) = BuscaTerminada res
 

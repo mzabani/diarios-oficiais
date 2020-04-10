@@ -1,6 +1,6 @@
 packages:
-  common/
-  backend/
-  frontend/
-  brdocs/
-  diarios-fetcher/
+  src/common/
+  src/backend/
+  src/frontend/
+  src/brdocs/
+  src/diarios-fetcher/

@@ -1,2 +1,2 @@
 language: nix
-script: make setup-cachix && make build-backend && make build-frontend && make build-diarios-fetcher
+script: make setup-cachix && make nix-build-backend && make nix-build-frontend && make nix-build-diarios-fetcher

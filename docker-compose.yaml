@@ -1,25 +1,56 @@
 version: '3.0'
 services:
-  diarios-backend:
+  diarios-oficiais-backend:
     ports:
       - "8080:8080"
     env_file:
-      - env/docker.env
-    image: diarios-backend
+      - ${LOCAL_DOCKER_ENV_FILE}
+    image: diarios-oficiais-backend
     depends_on:
       - postgresql
+    volumes:
+      - ./development/tlscert:/home/diarios-backend/tlscert
+    restart: unless-stopped
   diarios-fetcher:
     env_file:
-      - env/docker.env
+      - ${LOCAL_DOCKER_ENV_FILE}
     image: diarios-fetcher
     volumes:
       - ./data/diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
       - ./keys:/keys
+    restart: always
     depends_on:
       - postgresql
+    restart: unless-stopped
+  diarios-fetcher-fetch-all:
+    env_file:
+      - ${LOCAL_DOCKER_ENV_FILE}
+    image: diarios-fetcher
+    volumes:
+      - ./data/diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
+      - ./keys:/keys
+    command: /bin/diarios-fetcher-exe fetch
+    depends_on:
+      - postgresql
+    restart: "no"
   postgresql:
     env_file:
-      - env/docker.env
+      - ${LOCAL_DOCKER_ENV_FILE}
     image: postgresql
     volumes:
       - ./data/postgres-datadir:/home/postgres/postgres-datadir
+    restart: unless-stopped
+  db-history-update:
+    env_file:
+      - ${LOCAL_DOCKER_ENV_FILE}
+    image: db-history-update
+    volumes:
+      - ./db-history:/home/db-history-update/sql-migrations
+    restart: "no"
+  watchtower:
+    image: containrrr/watchtower:0.3.11
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json
+    command: --interval 30
+    restart: unless-stopped

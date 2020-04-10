@@ -2,12 +2,14 @@
 
 # Instruções
 
-1. Instale o Nix através do gerenciador de pacotes da sua distribuição ou executando `make setup-nix`. Não precisa estar como `root` para esta nem nenhuma das etapas.  
+Não precisa estar logado como `root` para esta nem nenhuma das etapas abaixo.
+
+1. Instale o Nix através do gerenciador de pacotes da sua distribuição ou executando `make setup-nix`. Siga as instruções após executar este comando para terminar a instalação. 
 2. Rode `make setup-cachix` se você não tem um cachix bem recente instalado.  
 3. Faça `git clone https://github.com/mzabani/diarios-oficiais.git` e digite `make shell` dentro do repositório para entrar numa shell com todas as dependências necessárias instaladas. Este processo pode demorar **quase uma hora** dependendo de sua conexão com a Internet e você vai precisar de muitos GB livre (talvez até 15GB) em disco por conta de todas as dependências. Nas próximas vezes que executar `make shell` entrará na shell em poucos segundos. Faça isso sempre que for desenvolver.
 4. Rode `make db-update`. Rode este comando sempre que fizer `git pull` para automaticamente aplicar novas migrações SQL
 5. Digite `make fetch` para baixar diários oficiais (se não não haverá nada para buscar). Pode cancelar o processo com Ctrl+C a hora que quiser se não quiser esperar muito; nenhum diário baixado até lá será perdido.
-6. Pronto. Rode `make build-frontend ghcid-backend` e acesse 'http://localhost:8080/index.html' para testar
+6. Pronto. Rode `make nix-build-frontend; cabal new-build backend; cabal new-run backend` e acesse 'https://localhost:8080/index.html' para testar
 
 ### Simulando ambiente de Produção
 
@@ -15,8 +17,8 @@ Imagens docker são produzidas para Deploy. Você pode executar tudo localmente 
 de produção. Para isso, faça:
 
 1. `make docker-all` para construir todas as imagens Docker e carregá-las para dentro do docker automaticamente.
-2. `docker-compose up` para iniciar todos os contêineres.
-3. `make build-frontend`, abra o arquivo `index.html` localizado em `results/frontend/bin/frontend.jsexe/index.html` no seu Browser (esta etapa simula o hosting do HTML no github.io, que é como é feito atualmente).
+2. `make nix-build-frontend run-production` para gerar o HTML e Javascript e iniciar todos os contêineres em seguida.
+3. Abra o arquivo `index.html` localizado em `results/frontend/bin/frontend.jsexe/index.html` no seu Browser (esta etapa simula o hosting do HTML no github.io, que é como é feito atualmente).
 
 ### Treinar algoritmo de Machine Learning
 

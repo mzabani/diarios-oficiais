@@ -29,10 +29,10 @@ jobs:
 
     # Runs a set of commands using the runners shell
     - name: Buildar backend
-      run: make build-backend
+      run: make nix-build-backend
 
     - name: Buildar frontend
-      run: make build-frontend
+      run: make nix-build-frontend
 
     - name: Buildar diarios-fetcher
-      run: make build-diarios-fetcher
+      run: make nix-build-diarios-fetcher

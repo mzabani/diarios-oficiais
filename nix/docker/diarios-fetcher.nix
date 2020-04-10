@@ -21,7 +21,7 @@ in pkgs.dockerTools.buildImage {
   '';
 
   config = {
-    Cmd = [ "/bin/diarios-fetcher-exe" ];
+    Cmd = "/bin/diarios-fetcher-exe";
     User = "diarios-fetcher:diarios-fetcher";
   };
 }

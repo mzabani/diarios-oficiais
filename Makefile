@@ -1,7 +1,10 @@
+# Por padrão buildamos para Produção, a não ser que haja variável de ambiente definida de acordo
+NIXBUILD:=nix-build --arg env-file $(if $(LOCAL_DOCKER_ENV_FILE),$(LOCAL_DOCKER_ENV_FILE),./env/production.env)
+
 setup-nix:
 	@echo "Isso irá instalar o Nix se você ainda não o tiver instalado"
 	@(curl --version || echo "Você precisa do curl instalado")
-	nix --version || ((curl -L --proto '=https' --tlsv1.2 https://nixos.org/nix/install | sh); . ~/.nix-profile/etc/profile.d/nix.sh)
+	nix --version || (curl -L --proto '=https' --tlsv1.2 https://nixos.org/nix/install | sh)
 
 setup-cachix:
 	@echo "Isso irá instalar o cachix para o seu usuário, além de configurá-lo para usar o mzabani.cachix.org"
@@ -9,51 +12,64 @@ setup-cachix:
 	cachix use mzabani
 
 shell:
-	@rm -f .ghc.environment.*
-	nix-shell -A shells.ghc
+	rm -f .ghc.environment.*
+	nix-shell
 
-.PHONY: build-backend
-build-backend:
-	nix-build -o results/backend -A ghc.backend
+.PHONY: nix-build-backend
+nix-build-backend:
+	${NIXBUILD} -o results/backend -A ghc.backend
 
-.PHONY: build-frontend
-build-frontend:
-	nix-build -o results/frontend -A ghcjs.frontend
+.PHONY: nix-build-frontend
+nix-build-frontend:
+	${NIXBUILD} -o results/frontend -A ghcjs.frontend
 
-.PHONY: build-diarios-fetcher
-build-diarios-fetcher:
-	nix-build -o results/diarios-fetcher -A ghc.diarios-fetcher
+.PHONY: nix-build-diarios-fetcher
+nix-build-diarios-fetcher:
+	${NIXBUILD} -o results/diarios-fetcher -A ghc.diarios-fetcher
 
 .PHONY: docker-backend
 docker-backend:
-	nix-build -o results/docker-backend nix/docker/diarios-backend.nix
+	${NIXBUILD} -o results/docker-backend nix/docker/diarios-backend.nix
 	docker load -i results/docker-backend
 	@echo "Imagem Docker do backend criada e carregada. Esta imagem inicializa o backend do Buscador Web"
 
 .PHONY: docker-fetcher
 docker-fetcher:
-	nix-build -o results/docker-fetcher nix/docker/diarios-fetcher.nix
+	${NIXBUILD} -o results/docker-fetcher nix/docker/diarios-fetcher.nix
 	docker load -i results/docker-fetcher
 	@echo "Imagem Docker do Fetcher de diários criada e carregada"
 
 .PHONY: docker-postgresql
 docker-postgresql:
-	nix-build -o results/docker-postgresql nix/docker/postgresql.nix
+	${NIXBUILD} -o results/docker-postgresql nix/docker/postgresql.nix
 	docker load -i results/docker-postgresql
 	@echo "Imagem Docker do serviço postgresql criada e carregada. Esta imagem inicializa o PostgreSQL"
 
-.PHONY: docker-all
-docker-all: docker-backend docker-fetcher docker-postgresql
+.PHONY: docker-db-history-update
+docker-db-history-update:
+	${NIXBUILD} -o results/docker-db-history-update nix/docker/db-history-update.nix
+	docker load -i results/docker-db-history-update
+	@echo "Imagem Docker do aplicador de migrações do DB criada e carregada."
 
-build-all: build-backend build-frontend build-diarios-fetcher
+.PHONY: docker-all
+docker-all: docker-backend docker-fetcher docker-postgresql docker-db-history-update
+
+.PHONY: run-production
+run-production:
+	pg_ctl stop || true
+	@echo "Isso irá inicializar as imagens Docker da forma mais parecida possível com o que se faz em Produção"
+	docker-compose up || true
+	pg_ctl start
+
+build-all: nix-build-backend nix-build-frontend nix-build-diarios-fetcher
 
 .PHONY: ghcid-frontend
 ghcid-frontend:
-	ghcid -W -c "cabal new-repl frontend --disable-optimization" -T Main.main
+	ghcid -W -c "cabal new-repl frontend --disable-optimization"
 
 .PHONY: ghcid-backend
 ghcid-backend:
-	ghcid -W -c "cabal new-repl backend --disable-optimization" -T Main.main
+	ghcid -W -c "cabal new-repl backend --disable-optimization"
 
 .PHONY: ghcid-fetcher
 ghcid-fetcher:

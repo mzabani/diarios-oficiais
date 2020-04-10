@@ -1,19 +1,25 @@
-{ reflex-platform ? import ./nix/reflex-platform.git.nix {} }:
+{ reflex-platform ? import ./nix/reflex-platform.git.nix {}
+, env-file }:
 let
   pkgs = import ./nix/nixpkgs.nix {};
+  utils = import ./nix/utils.nix {};
   nixpkgs = pkgs;
 
   extraBuildInputs = [
     pkgs.postgresql_12
     pkgs.xpdf
+    pkgs.xdg_utils
     pkgs.automake
     pkgs.docker
     pkgs.docker-compose
+    pkgs.docker-machine
     pkgs.evince
     pkgs.gnused
+    pkgs.certbot
+    pkgs.openssl
   ];
 
-  postgres-service = import nix/postgres-service.nix { postgres = pkgs.postgresql_12; runInBackground=true; inherit pkgs; };
+  postgres-service = import ./nix/postgres-service.nix { postgres = pkgs.postgresql_12; runInBackground=true; inherit pkgs; };
 
   reflexProj = reflex-platform.project (reflexAttrs: 
     let
@@ -23,11 +29,11 @@ let
     name = "diarios-oficiais";
 
     packages = {
-      brdocs = ./brdocs;
-      diarios-fetcher = ./diarios-fetcher;
-      common = ./common;
-      backend = ./backend;
-      frontend = ./frontend;
+      brdocs = ./src/brdocs;
+      diarios-fetcher = ./src/diarios-fetcher;
+      common = ./src/common;
+      backend = ./src/backend;
+      frontend = ./src/frontend;
     };
 
     overrides = self: super: {
@@ -45,7 +51,11 @@ let
   });
 in
   {
-    ghcjs = reflexProj.ghcjs;
+    ghcjs = reflexProj.ghcjs // {
+      # O nosso frontend e backend estão em servidores diferentes, e os Requests
+      # precisam ir para o endereço certo de acordo com o ambiente desejado (Dev, Produção etc.)
+      frontend = reflexProj.ghcjs.frontend.overrideAttrs (old: { BACKENDURL = utils.readDockerEnv "BACKENDURL" env-file; });
+    };
 
     ghc = reflexProj.ghc;
     
