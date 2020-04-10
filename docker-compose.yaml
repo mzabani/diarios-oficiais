@@ -4,7 +4,7 @@ services:
     ports:
       - "8080:8080"
     env_file:
-      - ${LOCAL_DOCKER_ENV_FILE}
+      - ./env/docker.env
     image: diarios-oficiais-backend
     depends_on:
       - postgresql
@@ -13,7 +13,7 @@ services:
     restart: unless-stopped
   diarios-fetcher:
     env_file:
-      - ${LOCAL_DOCKER_ENV_FILE}
+      - ./env/docker.env
     image: diarios-fetcher
     volumes:
       - ./data/diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
@@ -22,27 +22,16 @@ services:
     depends_on:
       - postgresql
     restart: unless-stopped
-  diarios-fetcher-fetch-all:
-    env_file:
-      - ${LOCAL_DOCKER_ENV_FILE}
-    image: diarios-fetcher
-    volumes:
-      - ./data/diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
-      - ./keys:/keys
-    command: /bin/diarios-fetcher-exe fetch
-    depends_on:
-      - postgresql
-    restart: "no"
   postgresql:
     env_file:
-      - ${LOCAL_DOCKER_ENV_FILE}
+      - ./env/docker.env
     image: postgresql
     volumes:
       - ./data/postgres-datadir:/home/postgres/postgres-datadir
     restart: unless-stopped
   db-history-update:
     env_file:
-      - ${LOCAL_DOCKER_ENV_FILE}
+      - ./env/docker.env
     image: db-history-update
     volumes:
       - ./db-history:/home/db-history-update/sql-migrations

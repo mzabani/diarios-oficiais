@@ -18,7 +18,8 @@ de produção. Para isso, faça:
 
 1. `make docker-all` para construir todas as imagens Docker e carregá-las para dentro do docker automaticamente.
 2. `make nix-build-frontend run-production` para gerar o HTML e Javascript e iniciar todos os contêineres em seguida.
-3. Abra o arquivo `index.html` localizado em `results/frontend/bin/frontend.jsexe/index.html` no seu Browser (esta etapa simula o hosting do HTML no github.io, que é como é feito atualmente).
+3. Acesse `https://localhost:8080` no Browser e ignore os riscos de segurança. Eles só existem pois o certificado é auto-gerado.
+4. Abra o arquivo `index.html` localizado em `/results/frontend/bin/frontend.jsexe/index.html` no seu Browser (esta etapa simula porcamente o hosting do HTML no github.io, que é como é feito atualmente).
 
 ### Treinar algoritmo de Machine Learning
 

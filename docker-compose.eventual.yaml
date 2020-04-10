@@ -1,0 +1,13 @@
+version: '3.0'
+services:
+  diarios-fetcher-fetch-all:
+    env_file:
+      - ./env/docker.env
+    image: diarios-fetcher
+    volumes:
+      - ./data/diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
+      - ./keys:/keys
+    command: /bin/diarios-fetcher-exe fetch
+    depends_on:
+      - postgresql
+    restart: "no"

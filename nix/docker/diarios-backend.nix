@@ -1,6 +1,7 @@
+{ env-file }:
 let
   pkgs = import ../nixpkgs.nix {};
-  env = import ../../default.nix {};
+  env = import ../../default.nix { inherit env-file; };
 
   useradd = "${pkgs.shadow}/bin/useradd";
 
