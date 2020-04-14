@@ -80,12 +80,12 @@ start = do
   basePath <- fromMaybe "./data/diarios-oficiais/" <$> lookupEnv "DIARIOSDIR"
   bracket (createDbPool 1 60 50) destroyAllResources $ \dbPool -> do
     createDirectoryIfMissing False basePath
-    awsConfig <- createAwsConfiguration
+    -- awsConfig <- createAwsConfiguration
     let ctx = AppContext {
       mgr = mgr,
       dbPool = dbPool,
-      basePath = basePath,
-      awsConfig = awsConfig
+      basePath = basePath
+      -- awsConfig = awsConfig
     }
     hj <- hoje
     args <- getArgs
@@ -145,8 +145,8 @@ start = do
 data AppContext = AppContext {
   mgr :: Manager,
   dbPool :: Pool PGS.Connection,
-  basePath :: String,
-  awsConfig :: Aws.Configuration
+  basePath :: String
+  -- awsConfig :: Aws.Configuration
 }
 
 -- | Baixa o diário e atualiza o banco de dados para torná-lo buscável

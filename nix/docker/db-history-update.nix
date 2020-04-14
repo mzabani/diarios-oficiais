@@ -1,4 +1,4 @@
-{ env-file }:
+{ env-file, sql-migrations-folder }:
 let
   pkgs = import ../nixpkgs.nix {};
   env = import ../../default.nix { inherit env-file; };
@@ -27,6 +27,8 @@ in pkgs.dockerTools.buildImage {
     ${useradd} -m -U db-history-update
     mkdir /tmp
     chmod a+rwx /tmp
+    mkdir /home/db-history-update/sql-migrations
+    cp ${sql-migrations-folder}/* /home/db-history-update/sql-migrations/
   '';
 
   config = {

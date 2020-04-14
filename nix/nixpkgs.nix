@@ -2,9 +2,11 @@
 let
     repo = systemPkgs.fetchFromGitHub {
         owner = "NixOS";
-        repo = "nixpkgs-channels";
-        rev = "7399c59c4150635b896470078c5f5d18d702061a";
-        sha256 = "0vqnfh99358v9ym5z9i3dsfy0l4xxgh9hr278pi1y11gdl092014";
+        repo = "nixpkgs";
+        # rev = "d07543a98cf316ceee7ae3535dc45a385df6b247";
+        rev = "f601ab37c2fb7e5f65989a92df383bcd6942567a";
+        # sha256 = "1wwg1h7i3xldq56w5gzd1jxzl742bgqymskjlc2ay9aa4kdqzm3a";
+        sha256 = "0ikhcmcc29iiaqjv5r91ncgxny2z67bjzkppd3wr1yx44sv7v69s";
     };
     config = {
             # xpdf tem vulnerabilidades, mas nós não nos importamos com isso no momento

@@ -1,5 +1,5 @@
 # Por padrão buildamos para Produção, a não ser que haja variável de ambiente definida de acordo
-NIXBUILD:=nix-build --arg env-file $(if $(LOCAL_DOCKER_ENV_FILE),$(LOCAL_DOCKER_ENV_FILE),./env/production.env)
+NIXBUILD:=nix-build --arg env-file $(if $(LOCAL_DOCKER_ENV_FILE),$(LOCAL_DOCKER_ENV_FILE),./env/prod/.env)
 
 setup-nix:
 	@echo "Isso irá instalar o Nix se você ainda não o tiver instalado"
@@ -22,6 +22,10 @@ nix-build-backend:
 .PHONY: nix-build-frontend
 nix-build-frontend:
 	${NIXBUILD} -o results/frontend -A ghcjs.frontend
+
+.PHONY: nix-build-frontend-simul-prod
+nix-build-frontend-simul-prod:
+	nix-build --arg env-file ./env/simul-prod/.env -o results/frontend -A ghcjs.frontend
 
 .PHONY: nix-build-diarios-fetcher
 nix-build-diarios-fetcher:
@@ -47,19 +51,25 @@ docker-postgresql:
 
 .PHONY: docker-db-history-update
 docker-db-history-update:
-	${NIXBUILD} -o results/docker-db-history-update nix/docker/db-history-update.nix
+	${NIXBUILD} -o results/docker-db-history-update --arg sql-migrations-folder ./db-history nix/docker/db-history-update.nix
 	docker load -i results/docker-db-history-update
 	@echo "Imagem Docker do aplicador de migrações do DB criada e carregada."
 
 .PHONY: docker-all
 docker-all: docker-backend docker-fetcher docker-postgresql docker-db-history-update
 
-.PHONY: run-production
-run-production:
+.PHONY: run-certbot
+run-certbot:
+	./scripts/run-certbot.sh
+
+.PHONY: simul-prod
+simul-prod: nix-build-frontend-simul-prod
+	docker-compose -f docker-compose.simul-prod.yaml down
 	pg_ctl stop || true
+	pkill -x pebble || true
 	@echo "Isso irá inicializar as imagens Docker da forma mais parecida possível com o que se faz em Produção"
-	docker-compose up || true
-	pg_ctl start
+	docker-compose -f docker-compose.simul-prod.yaml up || true
+	@echo "Ambiente agora está quebrado. Saida do shell com 'exit' e digite 'make shell' novamente"
 
 build-all: nix-build-backend nix-build-frontend nix-build-diarios-fetcher
 

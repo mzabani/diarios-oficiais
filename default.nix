@@ -17,6 +17,8 @@ let
     pkgs.gnused
     pkgs.certbot
     pkgs.openssl
+    pkgs.pebble
+    pkgs.procps
   ];
 
   postgres-service = import ./nix/postgres-service.nix { postgres = pkgs.postgresql_12; runInBackground=true; inherit pkgs; };
@@ -66,8 +68,13 @@ in
         buildInputs = old.buildInputs ++ extraBuildInputs;
 
         shellHook = ''
-        source scripts/source-env.sh env/development.env
+        source scripts/source-env.sh env/dev/.env
         ${postgres-service}/bin/init-postgres
+        
+        # Only run if pebble isn't running yet
+        mkdir -p env/dev/data/pebble
+        mkdir -p env/dev/data/backend-static-files
+        (pgrep pebble > /dev/null) || (pebble -config env/dev/pebble/pebble-config.json >env/dev/data/pebble/pebble-stdout.log 2>&1 &)
         '';
       });
     };

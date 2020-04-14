@@ -2,39 +2,37 @@ version: '3.0'
 services:
   diarios-oficiais-backend:
     ports:
-      - "8080:8080"
+      - "80:8080"
+      - "443:8083"
     env_file:
-      - ./env/docker.env
+      - ./env/prod/.env
     image: diarios-oficiais-backend
     depends_on:
       - postgresql
-    volumes:
-      - ./development/tlscert:/home/diarios-backend/tlscert
+      - db-history-update
     restart: unless-stopped
   diarios-fetcher:
     env_file:
-      - ./env/docker.env
+      - ./env/prod/.env
     image: diarios-fetcher
     volumes:
-      - ./data/diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
-      - ./keys:/keys
+      - ./diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
     restart: always
     depends_on:
       - postgresql
+      - db-history-update
     restart: unless-stopped
   postgresql:
     env_file:
-      - ./env/docker.env
+      - ./env/prod/.env
     image: postgresql
     volumes:
-      - ./data/postgres-datadir:/home/postgres/postgres-datadir
+      - ./postgres-datadir:/home/postgres/postgres-datadir
     restart: unless-stopped
   db-history-update:
     env_file:
-      - ./env/docker.env
+      - ./env/prod/.env
     image: db-history-update
-    volumes:
-      - ./db-history:/home/db-history-update/sql-migrations
     restart: "no"
   watchtower:
     image: containrrr/watchtower:0.3.11
