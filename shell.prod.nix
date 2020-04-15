@@ -1,0 +1,1 @@
+import ./shell.nix { env-file = env/prod/docker.env; }

@@ -1,5 +1,5 @@
 # Por padrão buildamos para Produção, a não ser que haja variável de ambiente definida de acordo
-NIXBUILD:=nix-build --arg env-file $(if $(LOCAL_DOCKER_ENV_FILE),$(LOCAL_DOCKER_ENV_FILE),./env/prod/.env)
+NIXBUILD:=nix-build --arg env-file $(if $(LOCAL_DOCKER_ENV_FILE),$(LOCAL_DOCKER_ENV_FILE),./env/prod/docker.env)
 
 setup-nix:
 	@echo "Isso irá instalar o Nix se você ainda não o tiver instalado"
@@ -25,7 +25,7 @@ nix-build-frontend:
 
 .PHONY: nix-build-frontend-simul-prod
 nix-build-frontend-simul-prod:
-	nix-build --arg env-file ./env/simul-prod/.env -o results/frontend -A ghcjs.frontend
+	nix-build --arg env-file ./env/simul-prod/docker.env -o results/frontend -A ghcjs.frontend
 
 .PHONY: nix-build-diarios-fetcher
 nix-build-diarios-fetcher:

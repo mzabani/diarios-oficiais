@@ -5,7 +5,7 @@ services:
       - "80:8080"
       - "443:8083"
     env_file:
-      - ./env/simul-prod/.env
+      - ./env/simul-prod/docker.env
     image: diarios-oficiais-backend
     depends_on:
       - postgresql
@@ -14,7 +14,7 @@ services:
     restart: unless-stopped
   diarios-fetcher:
     env_file:
-      - ./env/simul-prod/.env
+      - ./env/simul-prod/docker.env
     image: diarios-fetcher
     volumes:
       - ${DIARIOSDIR}:/home/diarios-fetcher/diarios-oficiais
@@ -25,14 +25,14 @@ services:
     restart: unless-stopped
   postgresql:
     env_file:
-      - ./env/simul-prod/.env
+      - ./env/simul-prod/docker.env
     image: postgresql
     volumes:
       - ${PGDATA}:/home/postgres/postgres-datadir
     restart: unless-stopped
   db-history-update:
     env_file:
-      - ./env/simul-prod/.env
+      - ./env/simul-prod/docker.env
     image: db-history-update
     depends_on:
         - postgresql
