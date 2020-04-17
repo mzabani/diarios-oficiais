@@ -49,14 +49,8 @@ docker-postgresql:
 	docker load -i results/docker-postgresql
 	@echo "Imagem Docker do serviço postgresql criada e carregada. Esta imagem inicializa o PostgreSQL"
 
-.PHONY: docker-db-history-update
-docker-db-history-update:
-	${NIXBUILD} -o results/docker-db-history-update --arg sql-migrations-folder ./db-history nix/docker/db-history-update.nix
-	docker load -i results/docker-db-history-update
-	@echo "Imagem Docker do aplicador de migrações do DB criada e carregada."
-
 .PHONY: docker-all
-docker-all: docker-backend docker-fetcher docker-postgresql docker-db-history-update
+docker-all: docker-backend docker-fetcher docker-postgresql
 
 .PHONY: run-certbot
 run-certbot:
@@ -95,12 +89,3 @@ fetch:
 profile-diarios:
 	cabal new-build --enable-profiling diarios-fetcher-exe
 	cabal new-run diarios-fetcher-exe -- +RTS -4096m -p -T -RTS fetch
-
-db-restart:
-	dropdb -U postgres --if-exists ${PGDATABASE}
-	make db-update
-
-db-update:
-	./scripts/bootstrap-db.sh
-	# TODO: Aplicar todas as migrações numa única transação (aplicação pós-deploy precisa de todas ou o deploy deve falhar)
-	find db-history -name '*.sql' | sort | xargs -L 1 ./scripts/aplicar-migracao.sh

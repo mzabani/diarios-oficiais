@@ -75,3 +75,4 @@ executable backend
                     , LambdaCase
                     , ViewPatterns
                     , ScopedTypeVariables
+                    , TupleSections

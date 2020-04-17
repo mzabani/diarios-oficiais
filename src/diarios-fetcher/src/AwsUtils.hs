@@ -4,7 +4,6 @@ import qualified RIO.ByteString as B
 import Aws
 import System.Environment (getEnv)
 import System.FilePath
-import Data.Maybe (fromMaybe)
 import qualified Data.Attoparsec.ByteString.Char8 as Parsec
 
 -- | Retorna a configuração Amazon do usuário IAM com as permissões necessárias pra esta aplicação funcionar.
