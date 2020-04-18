@@ -1,7 +1,9 @@
-{ env-file }:
+{ env-file, local-sql-migrations-dir }:
 let
   pkgs = import ../nixpkgs.nix {};
   env = import ../../default.nix { inherit env-file; };
+  utils = import ../utils.nix {};
+  sql-migrations-dir = utils.readDockerEnv "SQL_MIGRATIONS_DIR" env-file;
 
   useradd = "${pkgs.shadow}/bin/useradd";
 
@@ -19,6 +21,10 @@ in pkgs.dockerTools.buildImage {
     chmod a+rwx /tmp
     # Por que ghc está sendo instalado??
     ls /nix/store | grep "\-ghc\-" | xargs rm -rf
+
+    mkdir ${sql-migrations-dir}
+    chown diarios-fetcher ${sql-migrations-dir}
+    cp ${local-sql-migrations-dir}/*.sql ${sql-migrations-dir}
   '';
 
   config = {

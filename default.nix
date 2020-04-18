@@ -70,6 +70,7 @@ in
         shellHook = ''
         # Do not source the supplied env-file because folders in places that don't exist might get created!!
         source scripts/source-env.sh ./env/dev/docker.env
+        source scripts/source-env.sh ./env/local.env
         ${postgres-service}/bin/init-postgres
         
         # Only run if pebble isn't running yet

@@ -1,5 +1,6 @@
 # Por padrão buildamos para Produção, a não ser que haja variável de ambiente definida de acordo
 NIXBUILD:=nix-build --arg env-file $(if $(LOCAL_DOCKER_ENV_FILE),$(LOCAL_DOCKER_ENV_FILE),./env/prod/docker.env)
+NIXBUILD_DOCKER:=$(NIXBUILD) --arg local-sql-migrations-dir $(shell ./scripts/get-env.sh LOCAL_SQL_MIGRATIONS_DIR ./env/local.env)
 
 setup-nix:
 	@echo "Isso irá instalar o Nix se você ainda não o tiver instalado"
@@ -33,13 +34,13 @@ nix-build-diarios-fetcher:
 
 .PHONY: docker-backend
 docker-backend:
-	${NIXBUILD} -o results/docker-backend nix/docker/diarios-backend.nix
+	${NIXBUILD_DOCKER} -o results/docker-backend nix/docker/diarios-backend.nix
 	docker load -i results/docker-backend
 	@echo "Imagem Docker do backend criada e carregada. Esta imagem inicializa o backend do Buscador Web"
 
 .PHONY: docker-fetcher
 docker-fetcher:
-	${NIXBUILD} -o results/docker-fetcher nix/docker/diarios-fetcher.nix
+	${NIXBUILD_DOCKER} -o results/docker-fetcher nix/docker/diarios-fetcher.nix
 	docker load -i results/docker-fetcher
 	@echo "Imagem Docker do Fetcher de diários criada e carregada"
 
