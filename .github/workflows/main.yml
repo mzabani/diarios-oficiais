@@ -24,15 +24,12 @@ jobs:
     - uses: cachix/install-nix-action@v7
 
     # Runs a single command using the runners shell
-    - name: Instalar e configurar Cachix
+    - name: Install and configure Cachix
       run: make setup-cachix
 
     # Runs a set of commands using the runners shell
-    - name: Buildar backend
-      run: make nix-build-backend
+    - name: Build the frontend
+      run: make docker-build-frontend
 
-    - name: Buildar frontend
-      run: make nix-build-frontend
-
-    - name: Buildar diarios-fetcher
-      run: make nix-build-diarios-fetcher
+    - name: Build all Docker images
+      run: make docker-all
