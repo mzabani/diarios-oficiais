@@ -9,9 +9,9 @@ let
         sha256 = "0ikhcmcc29iiaqjv5r91ncgxny2z67bjzkppd3wr1yx44sv7v69s";
     };
     config = {
-            # xpdf tem vulnerabilidades, mas nós não nos importamos com isso no momento
+            # We don't care with xpdf's vulnerabilities for now..
             permittedInsecurePackages = [
-                "xpdf-4.02"
+                "xpdf-4.02" "pdftohtml-4.02"
             ];
         };
     beamOverlay = self: super: {

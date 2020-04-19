@@ -11,7 +11,7 @@ in pkgs.dockerTools.buildImage {
   name = "diarios-fetcher";
   tag = "latest";
 
-  contents = [ pkgs.coreutils pkgs.iputils pkgs.bash pkgs.xpdf pkgs.glibc pkgs.which pkgs.gnugrep pkgs.findutils env.ghc.diarios-fetcher ];
+  contents = [ pkgs.coreutils pkgs.iputils pkgs.bash pkgs.glibc pkgs.which pkgs.gnugrep pkgs.findutils env.ghc.diarios-fetcher ];
   runAsRoot = ''
     #!${pkgs.runtimeShell}
     export PATH="/bin/"
@@ -23,7 +23,7 @@ in pkgs.dockerTools.buildImage {
     ls /nix/store | grep "\-ghc\-" | xargs rm -rf
 
     mkdir ${sql-migrations-dir}
-    chown diarios-fetcher ${sql-migrations-dir}
+    chown diarios-fetcher.diarios-fetcher ${sql-migrations-dir}
     cp ${local-sql-migrations-dir}/*.sql ${sql-migrations-dir}
   '';
 

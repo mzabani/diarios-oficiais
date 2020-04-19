@@ -1,6 +1,4 @@
-# Por padrão buildamos para Produção, a não ser que haja variável de ambiente definida de acordo
-NIXBUILD:=nix-build --arg env-file $(if $(LOCAL_DOCKER_ENV_FILE),$(LOCAL_DOCKER_ENV_FILE),./env/prod/docker.env)
-NIXBUILD_DOCKER:=$(NIXBUILD) --arg local-sql-migrations-dir $(shell ./scripts/get-env.sh LOCAL_SQL_MIGRATIONS_DIR ./env/local.env)
+NIXBUILD_DOCKER:=nix-build --arg env-file $(if $(DOCKER_BUILD_ENV_FILE),$(DOCKER_BUILD_ENV_FILE),./env/prod/docker.env) --arg local-sql-migrations-dir $(shell ./scripts/get-env.sh LOCAL_SQL_MIGRATIONS_DIR ./env/local.env) --arg local-frontend-dir $(shell ./scripts/get-env.sh LOCAL_FRONTEND_DIR ./env/local.env)
 
 setup-nix:
 	@echo "Isso irá instalar o Nix se você ainda não o tiver instalado"
@@ -16,39 +14,28 @@ shell:
 	rm -f .ghc.environment.*
 	nix-shell
 
-.PHONY: nix-build-backend
-nix-build-backend:
-	${NIXBUILD} -o results/backend -A ghc.backend
+.PHONY: dev-build-frontend
+dev-build-frontend:
+	nix-build --arg env-file ./env/dev/docker.env -o results/frontend -A ghcjs.frontend
 
-.PHONY: nix-build-frontend
-nix-build-frontend:
-	${NIXBUILD} -o results/frontend -A ghcjs.frontend
-
-.PHONY: nix-build-frontend-simul-prod
-nix-build-frontend-simul-prod:
-	nix-build --arg env-file ./env/simul-prod/docker.env -o results/frontend -A ghcjs.frontend
-
-.PHONY: nix-build-diarios-fetcher
-nix-build-diarios-fetcher:
-	${NIXBUILD} -o results/diarios-fetcher -A ghc.diarios-fetcher
+.PHONY: docker-build-frontend
+docker-build-frontend:
+	${NIXBUILD_DOCKER} -o results/frontend -A ghcjs.frontend
 
 .PHONY: docker-backend
 docker-backend:
 	${NIXBUILD_DOCKER} -o results/docker-backend nix/docker/diarios-backend.nix
 	docker load -i results/docker-backend
-	@echo "Imagem Docker do backend criada e carregada. Esta imagem inicializa o backend do Buscador Web"
 
 .PHONY: docker-fetcher
 docker-fetcher:
 	${NIXBUILD_DOCKER} -o results/docker-fetcher nix/docker/diarios-fetcher.nix
 	docker load -i results/docker-fetcher
-	@echo "Imagem Docker do Fetcher de diários criada e carregada"
 
 .PHONY: docker-postgresql
 docker-postgresql:
 	${NIXBUILD} -o results/docker-postgresql nix/docker/postgresql.nix
 	docker load -i results/docker-postgresql
-	@echo "Imagem Docker do serviço postgresql criada e carregada. Esta imagem inicializa o PostgreSQL"
 
 .PHONY: docker-all
 docker-all: docker-backend docker-fetcher docker-postgresql
@@ -58,13 +45,11 @@ run-certbot:
 	./scripts/run-certbot.sh
 
 .PHONY: simul-prod
-simul-prod: nix-build-frontend-simul-prod
+simul-prod: docker-build-frontend
 	docker-compose -f docker-compose.simul-prod.yaml down
 	pg_ctl stop || true
 	pkill -x pebble || true
-	@echo "Isso irá inicializar as imagens Docker da forma mais parecida possível com o que se faz em Produção"
-	docker-compose -f docker-compose.simul-prod.yaml up || true
-	@echo "Ambiente agora está quebrado. Saida do shell com 'exit' e digite 'make shell' novamente"
+	docker-compose -f docker-compose.simul-prod.yaml up
 
 build-all: nix-build-backend nix-build-frontend nix-build-diarios-fetcher
 
@@ -82,7 +67,7 @@ ghcid-fetcher:
 
 hoogle:
 	hoogle server --local --port=8000 2>/dev/null 1>/dev/null &
-	xdg-open http://localhost:8000/
+	xdg-open http://localhost:8000/ 2>/dev/null 1>/dev/null &
 
 fetch:
 	cabal new-run diarios-fetcher-exe -- +RTS -M4096m -RTS fetch

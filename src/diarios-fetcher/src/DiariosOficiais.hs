@@ -118,7 +118,7 @@ start = do
         liftIO $ putStrLn "\"c\" para início de Cabeçalho"
         liftIO $ putStrLn "\"s\" para sair (a opção de salvar ou não aparecerá em seguida)"
         liftIO $ putStrLn ""
-        matchingEsperado <- Process.withProcessWait (Process.shell $ "evince \"" ++ fullPath ++ "\"") $ \_ ->
+        matchingEsperado <- Process.withProcessWait (Process.shell $ "xdg-open \"" ++ fullPath ++ "\"") $ \_ ->
           forMUntilNothing binfos $ \binfo -> do
             let readMatch = liftIO getLine >>= \case
                                                         "m" -> return $ Just PP.DoMesmoParagrafo

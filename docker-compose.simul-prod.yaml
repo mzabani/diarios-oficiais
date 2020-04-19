@@ -10,7 +10,6 @@ services:
     depends_on:
       - postgresql
       - pebble
-      - db-history-update
     restart: unless-stopped
   diarios-fetcher:
     env_file:
@@ -21,7 +20,6 @@ services:
     restart: always
     depends_on:
       - postgresql
-      - db-history-update
     restart: unless-stopped
   postgresql:
     env_file:
@@ -30,13 +28,6 @@ services:
     volumes:
       - ${PGDATA}:/home/postgres/postgres-datadir
     restart: unless-stopped
-  db-history-update:
-    env_file:
-      - ./env/simul-prod/docker.env
-    image: db-history-update
-    depends_on:
-        - postgresql
-    restart: "no"
   pebble:
     image: letsencrypt/pebble
     command: pebble -config /test/pebble-config.json

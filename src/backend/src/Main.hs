@@ -37,11 +37,11 @@ type SinglePageAPI = "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON]
                 :<|> "ler" :> Capture "conteudoDiarioId" Int :> Get '[HTML] Blaze.Html
                 :<|> Raw
 
-singlePageServer :: Pool Connection -> Server SinglePageAPI
-singlePageServer connectionPool = 
+singlePageServer :: FilePath -> Pool Connection -> Server SinglePageAPI
+singlePageServer frontendDir connectionPool = 
                              Busca.buscaPost connectionPool
                         :<|> Ler.lerDiario connectionPool
-                        :<|> serveDirectoryWebApp "results/frontend/bin/frontend.jsexe/"
+                        :<|> serveDirectoryWebApp frontendDir
 
 acmeChallengeServer :: FilePath -> Server AcmeChallengeAPI
 acmeChallengeServer acmeChallengePath = serveDirectoryWebApp acmeChallengePath
@@ -61,6 +61,7 @@ main = do
     certKeyExists <- doesFileExist certKey
     certExists <- doesFileExist cert
     staticFilesPath <- getEnv "BACKEND_STATIC_FILES_PATH"
+    frontendDir <- getEnv "FRONTEND_DIR"
     dbVcsInfo <- getDbVcsInfo
     let
         acmeChallengePath = staticFilesPath </> ".well-known/acme-challenge"
@@ -79,4 +80,4 @@ main = do
         let tlss = Warp.tlsSettings cert certKey
             warps = Warp.setPort 8083 Warp.defaultSettings
         putStrLn "Starting Web Server"
-        Warp.runTLS tlss warps $ cors (const corsResourcePolicy) $ serve (Proxy :: Proxy SinglePageAPI) (singlePageServer connectionPool)
+        Warp.runTLS tlss warps $ cors (const corsResourcePolicy) $ serve (Proxy :: Proxy SinglePageAPI) (singlePageServer frontendDir connectionPool)

@@ -1,25 +1,29 @@
-[![Build Status](https://travis-ci.com/mzabani/diarios-oficiais.svg?branch=master)](https://travis-ci.com/mzabani/diarios-oficiais)
+# Instructions
 
-# Instruções
+### 1. Entering the development shell
 
-Não precisa estar logado como `root` para esta nem nenhuma das etapas abaixo.
+1. Run `git clone https://github.com/mzabani/diarios-oficiais.git` and enter the created directory by running `cd diarios-oficiais`.
+2. Install Nix through your Distro's package manager or by running `make setup-nix`. Follow the instructions to finish the installation.
+3. Run `make setup-cachix`. This will install `cachix` unless you already have it and set up `mzabani.cachix.org` as a Cache server.
+4. Run `make shell` inside the repo. This will fetch every required dependency for the full development environment and so can take quite a while depending on your Internet connection. You'll also need lots of disk space (up to 15GB).
+5. Now you won't need to run steps 1-3 any more. Always type `make shell` to enter the development shell, and next times it'll be just a few seconds to do so.
 
-1. Instale o Nix através do gerenciador de pacotes da sua distribuição ou executando `make setup-nix`. Siga as instruções após executar este comando para terminar a instalação. 
-2. Rode `make setup-cachix` se você não tem um cachix bem recente instalado.  
-3. Faça `git clone https://github.com/mzabani/diarios-oficiais.git` e digite `make shell` dentro do repositório para entrar numa shell com todas as dependências necessárias instaladas. Este processo pode demorar **quase uma hora** dependendo de sua conexão com a Internet e você vai precisar de muitos GB livre (talvez até 15GB) em disco por conta de todas as dependências. Nas próximas vezes que executar `make shell` entrará na shell em poucos segundos. Faça isso sempre que for desenvolver.
-4. Rode `make db-update`. Rode este comando sempre que fizer `git pull` para automaticamente aplicar novas migrações SQL
-5. Digite `make fetch` para baixar diários oficiais (se não não haverá nada para buscar). Pode cancelar o processo com Ctrl+C a hora que quiser se não quiser esperar muito; nenhum diário baixado até lá será perdido.
-6. Pronto. Rode `make nix-build-frontend; cabal build backend; cabal run backend` e acesse 'https://localhost:8083/index.html' para testar. Ignore os riscos de segurança; eles só existem pois o certificado é auto-gerado.
+### 2. Running the application
 
-### Simulando ambiente de Produção
+1. Run `make fetch` to download the Diários Oficiais (Official Journals) or else there won't be anything to search for. You can stop fetching by typing Ctrl+C any time; no fetched journals will be lost when you do this.
+2. Ok. Run `make nix-build-frontend; cabal run backend`.
+3. Only if this is the very first time you typed `cabal run backend`, a TLS certificate will need to be acquired. Run `make run-certbot` in a separate development shell **without stopping the backend** and wait until it succeed. Now you can kill the backend and run `cabal run backend` again.
+4. Go to 'https://localhost:8083/index.html' to test. Ignore any safety risks; they only exist because the certificate is a "toy" certificate, not signed by a trusted CA.
 
-Imagens docker são produzidas para Deploy. Você pode executar tudo localmente de forma muito similar a como é feito no ambiente
-de produção. Para isso, faça:
+### 3. Simulating Production locally
 
-1. `make docker-all` para construir todas as imagens Docker e carregá-las para dentro do docker automaticamente.
-2. `make simul-prod` para gerar o HTML e Javascript e iniciar todos os contêineres em seguida.
-3. Acesse `https://localhost/` no Browser e ignore os riscos de segurança; eles só existem pois o certificado é auto-gerado.
-4. Abra o arquivo `index.html` localizado em `/results/frontend/bin/frontend.jsexe/index.html` no seu Browser (esta etapa simula porcamente o hosting do HTML no github.io, que é como é feito atualmente).
+Docker images are built for Deployment purposes. You can run it all locally in a very similar fashion to what it's done in Production. In order to do that, follow the instructions below:
+
+1. You'll need Docker configured and running.
+2. `make docker-all` to build all Docker images and load them with docker automatically.
+3. `make simul-prod` to kill applications which are running locally (such as postgres and pebble) and start all the containers right away.
+4. Go to `https://localhost/index.html` in your Browser and ignore safety risks.
+5. After you stop `docker-compose`, postgres and pebble won't be started for you. I recommend typing `exit` and `make shell` again to restore the environment.
 
 ### Treinar algoritmo de Machine Learning
 

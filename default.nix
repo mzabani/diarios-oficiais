@@ -3,20 +3,15 @@
 let
   pkgs = import ./nix/nixpkgs.nix {};
   utils = import ./nix/utils.nix {};
+  pdftohtml = import ./nix/packages/pdftohtml.nix {};
   nixpkgs = pkgs;
 
   extraBuildInputs = [
-    pkgs.postgresql_12
-    pkgs.xpdf
-    pkgs.xdg_utils
+    pdftohtml
     pkgs.automake
-    pkgs.docker
     pkgs.docker-compose
-    pkgs.docker-machine
-    pkgs.evince
     pkgs.gnused
     pkgs.certbot
-    pkgs.openssl
     pkgs.pebble
     pkgs.procps
   ];
@@ -59,7 +54,11 @@ in
       frontend = reflexProj.ghcjs.frontend.overrideAttrs (old: { BACKENDURL = utils.readDockerEnv "BACKENDURL" env-file; });
     };
 
-    ghc = reflexProj.ghc;
+    ghc = reflexProj.ghc // {
+      backend = reflexProj.ghc.backend.overrideAttrs (old: {
+        buildInputs = old.buildInputs ++ [ pdftohtml ];
+      });
+    };
     
     shells = {
       ghcjs = reflexProj.shells.ghcjs;

@@ -9,7 +9,6 @@ services:
     image: diarios-oficiais-backend
     depends_on:
       - postgresql
-      - db-history-update
     restart: unless-stopped
   diarios-fetcher:
     env_file:
@@ -20,7 +19,6 @@ services:
     restart: always
     depends_on:
       - postgresql
-      - db-history-update
     restart: unless-stopped
   postgresql:
     env_file:
@@ -29,11 +27,6 @@ services:
     volumes:
       - ./postgres-datadir:/home/postgres/postgres-datadir
     restart: unless-stopped
-  db-history-update:
-    env_file:
-      - ./env/prod/docker.env
-    image: db-history-update
-    restart: "no"
   watchtower:
     image: containrrr/watchtower:0.3.11
     volumes:

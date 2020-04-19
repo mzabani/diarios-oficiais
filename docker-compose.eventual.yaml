@@ -9,5 +9,4 @@ services:
     command: /bin/diarios-fetcher-exe fetch
     depends_on:
       - postgresql
-      - db-history-update
     restart: "no"

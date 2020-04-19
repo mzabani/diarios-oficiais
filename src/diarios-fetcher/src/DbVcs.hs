@@ -30,8 +30,8 @@ bringDbUpToDate DbVcsInfo { superUserConnString, dbName, appUser, sqlMigrationsD
     let
         unsafeDbName = fromString dbName
         unsafeAppUser = fromString appUser
-    putStrLn "Going to apply sql migrations... "
-    -- TODO: Database server might not be ready, retry with some sleeping in between!!
+    putStr "Going to apply sql migrations... "
+    -- TODO: Database server might not be ready, retry connect with some sleeping in between!!
     bracket (DB.connect superUserConnString) DB.close $ \conn -> do
         dbExists <- isSingleTrue <$> DB.query conn "SELECT TRUE FROM pg_database WHERE datname = ?" (DB.Only dbName)
         userExists <- isSingleTrue <$> DB.query conn "SELECT TRUE FROM pg_catalog.pg_roles WHERE rolname = ?" (DB.Only appUser)
