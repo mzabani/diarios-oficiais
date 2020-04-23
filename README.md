@@ -11,8 +11,8 @@
 ### 2. Running the application
 
 1. Run `make fetch` to download the Diários Oficiais (Official Journals) or else there won't be anything to search for. You can stop fetching by typing Ctrl+C any time; no fetched journals will be lost when you do this.
-2. Ok. Run `make nix-build-frontend; cabal run backend`.
-3. Only if this is the very first time you typed `cabal run backend`, a TLS certificate will need to be acquired. Run `make run-certbot` in a separate development shell **without stopping the backend** and wait until it succeed. Now you can kill the backend and run `cabal run backend` again.
+2. Run `make dev-build-frontend; cabal run backend`.
+3. Only if this is the very first time you typed `cabal run backend`, a TLS certificate will need to be acquired. Run `make run-certbot` in a separate development shell **without stopping the backend** and wait until it succeeds. Now you can kill the backend and run `cabal run backend` again.
 4. Go to 'https://localhost:8083/index.html' to test. Ignore any safety risks; they only exist because the certificate is a "toy" certificate, not signed by a trusted CA.
 
 ### 3. Simulating Production locally

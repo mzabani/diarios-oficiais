@@ -1,4 +1,4 @@
-NIXBUILD_DOCKER:=nix-build --arg env-file $(if $(DOCKER_BUILD_ENV_FILE),$(DOCKER_BUILD_ENV_FILE),./env/prod/docker.env) --arg local-sql-migrations-dir $(shell ./scripts/get-env.sh LOCAL_SQL_MIGRATIONS_DIR ./env/local.env) --arg local-frontend-dir $(shell ./scripts/get-env.sh LOCAL_FRONTEND_DIR ./env/local.env)
+NIXBUILD_DOCKER:=nix-build --arg env-file $(if $(DOCKER_BUILD_ENV_FILE),$(DOCKER_BUILD_ENV_FILE),./env/prod/docker.env) --arg local-sql-migrations-dir $(shell ./scripts/get-env.sh LOCAL_SQL_MIGRATIONS_DIR ./env/local.env)
 
 setup-nix:
 	@echo "Isso irá instalar o Nix se você ainda não o tiver instalado"
@@ -34,7 +34,7 @@ docker-fetcher:
 
 .PHONY: docker-postgresql
 docker-postgresql:
-	${NIXBUILD} -o results/docker-postgresql nix/docker/postgresql.nix
+	${NIXBUILD_DOCKER} -o results/docker-postgresql nix/docker/postgresql.nix
 	docker load -i results/docker-postgresql
 
 .PHONY: docker-all

@@ -19,8 +19,8 @@ in pkgs.dockerTools.buildImage {
     ${useradd} -m -U diarios-fetcher
     mkdir /tmp
     chmod a+rwx /tmp
-    # Por que ghc está sendo instalado??
-    ls /nix/store | grep "\-ghc\-" | xargs rm -rf
+    # Por que ghc está sendo instalado?? rm -rf abaixo dá permission denied..
+    # rm -rf /nix/store/*-ghc-*
 
     mkdir ${sql-migrations-dir}
     chown diarios-fetcher.diarios-fetcher ${sql-migrations-dir}

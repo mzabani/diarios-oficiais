@@ -1,10 +1,11 @@
-{ env-file, local-sql-migrations-dir, local-frontend-dir }:
+{ env-file, local-sql-migrations-dir }:
 let
   pkgs = import ../nixpkgs.nix {};
   env = import ../../default.nix { inherit env-file; };
   utils = import ../utils.nix {};
   sql-migrations-dir = utils.readDockerEnv "SQL_MIGRATIONS_DIR" env-file;
   frontend-dir = utils.readDockerEnv "FRONTEND_DIR" env-file;
+  frontend = env.ghcjs.frontend;
 
   useradd = "${pkgs.shadow}/bin/useradd";
 
@@ -29,7 +30,7 @@ in pkgs.dockerTools.buildImage {
 
     mkdir ${frontend-dir}
     chown diarios-backend.diarios-backend ${frontend-dir}
-    cp ${local-frontend-dir}/* ${frontend-dir}
+    cp ${frontend}/bin/frontend.jsexe/* ${frontend-dir}
   '';
 
   config = {

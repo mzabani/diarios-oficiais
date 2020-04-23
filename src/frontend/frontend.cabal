@@ -17,7 +17,7 @@ cabal-version:       >=1.10
 
 executable frontend
   main-is:             Main.hs
-  other-modules: BuildEnv
+  other-modules:       BuildEnv
   -- other-extensions:
   build-depends:       base >=4.12 && <4.13
                      , common
