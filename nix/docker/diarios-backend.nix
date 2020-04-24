@@ -16,7 +16,7 @@ in pkgs.dockerTools.buildImage {
   name = "diarios-oficiais-backend";
   tag = "latest";
 
-  contents = [ pkgs.coreutils pkgs.iputils pkgs.bash pkgs.procps pkgs.certbot run-backend-with-certbot run-certbot env.ghc.backend ];
+  contents = [ pkgs.coreutils pkgs.iputils pkgs.bash pkgs.procps pkgs.certbot run-backend-with-certbot run-certbot env.ghc-static.backend ];
   runAsRoot = ''
     export PATH="/bin/"
     ${pkgs.dockerTools.shadowSetup}

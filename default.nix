@@ -47,7 +47,7 @@ let
     };
   });
 in
-  {
+  rec {
     ghcjs = reflexProj.ghcjs // {
       # O nosso frontend e backend estão em servidores diferentes, e os Requests
       # precisam ir para o endereço certo de acordo com o ambiente desejado (Dev, Produção etc.)
@@ -55,9 +55,14 @@ in
     };
 
     ghc = reflexProj.ghc // {
-      backend = reflexProj.ghc.backend.overrideAttrs (old: {
+      diarios-fetcher = reflexProj.ghc.diarios-fetcher.overrideAttrs (old: {
         buildInputs = old.buildInputs ++ [ pdftohtml ];
       });
+    };
+
+    ghc-static = ghc // {
+      backend = pkgs.haskell.lib.justStaticExecutables ghc.backend;
+      diarios-fetcher = pkgs.haskell.lib.justStaticExecutables ghc.diarios-fetcher;
     };
     
     shells = {

@@ -9,7 +9,7 @@ let
         sha256 = "0ikhcmcc29iiaqjv5r91ncgxny2z67bjzkppd3wr1yx44sv7v69s";
     };
     config = {
-            # We don't care with xpdf's vulnerabilities for now..
+            # We don't care about xpdf's vulnerabilities for now..
             permittedInsecurePackages = [
                 "xpdf-4.02" "pdftohtml-4.02"
             ];
