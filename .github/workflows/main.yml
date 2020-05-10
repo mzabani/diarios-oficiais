@@ -26,7 +26,7 @@ jobs:
     
     - uses: cachix/install-nix-action@v7
 
-    - name: Install and configure Cachix
+    - name: Configure Cachix
       run: make setup-cachix
 
     - name: Build all Docker images
