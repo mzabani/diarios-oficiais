@@ -2,7 +2,7 @@
 
 ### 1. Entering the development shell
 
-1. Run `git clone https://github.com/mzabani/diarios-oficiais.git` and enter the created directory by running `cd diarios-oficiais`.
+1. Run `git clone --recursive https://github.com/mzabani/diarios-oficiais.git` and enter the created directory by running `cd diarios-oficiais`.
 2. Install Nix through your Distro's package manager or by running `make setup-nix`. Follow the instructions to finish the installation.
 3. Run `make setup-cachix`. This will install `cachix` unless you already have it and set up `mzabani.cachix.org` as a Cache server.
 4. Run `make shell` inside the repo. This will fetch every required dependency for the full development environment and so can take quite a while depending on your Internet connection. You'll also need lots of disk space (up to 15GB).
