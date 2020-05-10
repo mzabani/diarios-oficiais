@@ -18,10 +18,6 @@ shell:
 dev-build-frontend:
 	nix-build --arg env-file ./env/dev/docker.env -o results/frontend -A ghcjs.frontend
 
-.PHONY: docker-build-frontend
-docker-build-frontend:
-	${NIXBUILD_DOCKER} -o results/frontend -A ghcjs.frontend
-
 .PHONY: docker-backend
 docker-backend:
 	${NIXBUILD_DOCKER} -o results/docker-backend nix/docker/diarios-backend.nix
@@ -45,13 +41,11 @@ run-certbot:
 	./scripts/run-certbot.sh
 
 .PHONY: simul-prod
-simul-prod: docker-build-frontend
+simul-prod:
 	docker-compose -f docker-compose.simul-prod.yaml down
 	pg_ctl stop || true
 	pkill -x pebble || true
 	docker-compose -f docker-compose.simul-prod.yaml up
-
-build-all: nix-build-backend nix-build-frontend nix-build-diarios-fetcher
 
 .PHONY: ghcid-frontend
 ghcid-frontend:
