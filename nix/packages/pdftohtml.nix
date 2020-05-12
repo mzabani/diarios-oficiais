@@ -1,4 +1,4 @@
-{ pkgs ? import ../nixpkgs.nix {} }:
+{ pkgs ? import ../nixpkgs.nix }:
     (pkgs.xpdf.override { enableGUI = false; enablePDFtoPPM = false; enablePrinting = false; }).overrideAttrs (old: {
             pname = "pdftohtml";
             nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.qt5.qmake ];

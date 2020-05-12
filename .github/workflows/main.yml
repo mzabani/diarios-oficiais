@@ -25,9 +25,17 @@ jobs:
         submodules: recursive
     
     - uses: cachix/install-nix-action@v7
+    - uses: cachix/cachix-action@v6
+      with:
+        name: mzabani
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+        skipPush: true
 
-    - name: Configure Cachix
-      run: make setup-cachix
+    - name: Build the frontend
+      run: make nix-build-frontend
 
-    - name: Build all Docker images
-      run: make docker-all
+    - name: Build the backend
+      run: make nix-build-backend
+
+    - name: Build diarios-fetcher
+      run: make nix-build-diarios-fetcher

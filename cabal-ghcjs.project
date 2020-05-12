@@ -1,4 +1,4 @@
 compiler: ghcjs
 packages:
-  common/
-  frontend/
+  src/common/
+  src/frontend/

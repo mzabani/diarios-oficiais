@@ -1,6 +1,6 @@
 { env-file, local-sql-migrations-dir }:
 let
-  pkgs = import ../nixpkgs.nix {};
+  pkgs = import ../nixpkgs.nix;
   env = import ../../default.nix { inherit env-file; };
   utils = import ../utils.nix {};
   sql-migrations-dir = utils.readDockerEnv "SQL_MIGRATIONS_DIR" env-file;

@@ -1,5 +1,5 @@
 let
-  pkgs = import ../nixpkgs.nix {};
+  pkgs = import ../nixpkgs.nix;
 
   postgres-service = import ../postgres-service.nix { postgres = pkgs.postgresql_12; runInBackground=false; inherit pkgs; };
 

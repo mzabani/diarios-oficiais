@@ -7,7 +7,7 @@ setup-nix:
 
 setup-cachix:
 	@echo "Isso irá instalar o cachix para o seu usuário, além de configurá-lo para usar o mzabani.cachix.org"
-	@(cachix --version || nix-env -iA cachix -f nix/nixpkgs.nix)
+	@(cachix --version || nix-env -iA cachix -f https://cachix.org/api/v1/install)
 	cachix use mzabani
 
 shell:
@@ -17,6 +17,8 @@ shell:
 .PHONY: dev-build-frontend
 dev-build-frontend:
 	nix-build --arg env-file ./env/dev/docker.env -o results/frontend -A ghcjs.frontend
+	# nix-shell --arg env-file ./env/dev/docker.env -A shells.ghcjs default.nix --run \
+	# 	"cabal --project-file=cabal-ghcjs.project --builddir=dist-ghcjs build frontend && cabal --project-file=cabal-ghcjs.project --builddir=dist-ghcjs --installdir=./results/frontend/ install frontend"
 
 .PHONY: docker-backend
 docker-backend:
@@ -35,6 +37,18 @@ docker-postgresql:
 
 .PHONY: docker-all
 docker-all: docker-backend docker-fetcher docker-postgresql
+
+.PHONY: nix-build-frontend
+nix-build-frontend:
+	nix-build --arg env-file ./env/prod/docker.env -o results/frontend -A ghcjs.frontend
+
+.PHONY: nix-build-backend
+nix-build-backend:
+	nix-build --arg env-file ./env/prod/docker.env -o results/backend -A ghc-static.backend
+
+.PHONY: nix-build-diarios-fetcher
+nix-build-diarios-fetcher:
+	nix-build --arg env-file ./env/prod/docker.env -o results/diarios-fetcher -A ghc-static.diarios-fetcher
 
 .PHONY: run-certbot
 run-certbot:

@@ -1,4 +1,3 @@
-{ bootstrap ? import <nixpkgs> {} }:
 let
   config = {
     # We don't care about xpdf's vulnerabilities for now..

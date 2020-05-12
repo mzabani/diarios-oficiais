@@ -1,7 +1,7 @@
-{ reflex-platform ? import ./nix/reflex-platform.git.nix {}
+{ reflex-platform ? import ./nix/reflex-platform.git.nix
 , env-file }:
 let
-  pkgs = import ./nix/nixpkgs.nix {};
+  pkgs = import ./nix/nixpkgs.nix;
   utils = import ./nix/utils.nix {};
   pdftohtml = import ./nix/packages/pdftohtml.nix {};
   nixpkgs = pkgs;
@@ -34,8 +34,6 @@ let
     };
 
     overrides = self: super: {
-      # Nosso nixpkgs está com os pacotes que precisamos já definidos através de overlays, mas referenciá-los
-      # aqui não funciona direito por algum motivo..
       beam-migrate =  reflexPkgs.haskell.lib.doJailbreak (self.callPackage ./nix/haskell/beam-migrate.nix {});
       beam-postgres = reflexPkgs.haskell.lib.doJailbreak (reflexPkgs.haskell.lib.dontCheck (self.callPackage ./nix/haskell/beam-postgres.nix {}));
       beam-core =     reflexPkgs.haskell.lib.doJailbreak (self.callPackage ./nix/haskell/beam-core.nix {});
@@ -49,8 +47,8 @@ let
 in
   rec {
     ghcjs = reflexProj.ghcjs // {
-      # O nosso frontend e backend estão em servidores diferentes, e os Requests
-      # precisam ir para o endereço certo de acordo com o ambiente desejado (Dev, Produção etc.)
+      # Our frontend and backend are hosted on different servers, and Requests
+      # need to go to the right address according to the desired environment (Dev, Production etc.)
       frontend = reflexProj.ghcjs.frontend.overrideAttrs (old: { BACKENDURL = utils.readDockerEnv "BACKENDURL" env-file; });
     };
 
