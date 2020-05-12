@@ -1,9 +1,10 @@
 dist/
 dist-newstyle/
+dist-ghcjs/
 frontend-result
 data/
-keys/
 results/
+env/prod/secrets
 
 cabal-dev
 *.o

@@ -1,0 +1,36 @@
+version: '3.0'
+services:
+  diarios-oficiais-backend:
+    ports:
+      - "80:8080"
+      - "443:8083"
+    env_file:
+      - ./env/prod/docker.env
+    image: diarios-oficiais-backend
+    depends_on:
+      - postgresql
+    restart: unless-stopped
+  diarios-fetcher:
+    env_file:
+      - ./env/prod/docker.env
+    image: diarios-fetcher
+    volumes:
+      - ./diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
+    restart: always
+    depends_on:
+      - postgresql
+    restart: unless-stopped
+  postgresql:
+    env_file:
+      - ./env/prod/docker.env
+    image: postgresql
+    volumes:
+      - ./postgres-datadir:/home/postgres/postgres-datadir
+    restart: unless-stopped
+  watchtower:
+    image: containrrr/watchtower:0.3.11
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /root/.docker/config.json:/config.json
+    command: --interval 30
+    restart: unless-stopped

@@ -21,18 +21,21 @@ jobs:
     steps:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    
     - uses: cachix/install-nix-action@v7
+    - uses: cachix/cachix-action@v6
+      with:
+        name: mzabani
+        signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
+        skipPush: true
 
-    # Runs a single command using the runners shell
-    - name: Instalar e configurar Cachix
-      run: make setup-cachix
-
-    # Runs a set of commands using the runners shell
-    - name: Buildar backend
-      run: make nix-build-backend
-
-    - name: Buildar frontend
+    - name: Build the frontend
       run: make nix-build-frontend
 
-    - name: Buildar diarios-fetcher
+    - name: Build the backend
+      run: make nix-build-backend
+
+    - name: Build diarios-fetcher
       run: make nix-build-diarios-fetcher

@@ -1,5 +1,4 @@
-# Por padrão buildamos para Produção, a não ser que haja variável de ambiente definida de acordo
-NIXBUILD:=nix-build --arg env-file $(if $(LOCAL_DOCKER_ENV_FILE),$(LOCAL_DOCKER_ENV_FILE),./env/production.env)
+NIXBUILD_DOCKER:=nix-build --arg env-file $(if $(DOCKER_BUILD_ENV_FILE),$(DOCKER_BUILD_ENV_FILE),./env/prod/docker.env) --arg local-sql-migrations-dir $(shell ./scripts/get-env.sh LOCAL_SQL_MIGRATIONS_DIR ./env/local.env)
 
 setup-nix:
 	@echo "Isso irá instalar o Nix se você ainda não o tiver instalado"
@@ -8,60 +7,59 @@ setup-nix:
 
 setup-cachix:
 	@echo "Isso irá instalar o cachix para o seu usuário, além de configurá-lo para usar o mzabani.cachix.org"
-	@(cachix --version || nix-env -iA cachix -f nix/nixpkgs.nix)
+	@(cachix --version || nix-env -iA cachix -f https://cachix.org/api/v1/install)
 	cachix use mzabani
 
 shell:
 	rm -f .ghc.environment.*
 	nix-shell
 
-.PHONY: nix-build-backend
-nix-build-backend:
-	${NIXBUILD} -o results/backend -A ghc.backend
-
-.PHONY: nix-build-frontend
-nix-build-frontend:
-	${NIXBUILD} -o results/frontend -A ghcjs.frontend
-
-.PHONY: nix-build-diarios-fetcher
-nix-build-diarios-fetcher:
-	${NIXBUILD} -o results/diarios-fetcher -A ghc.diarios-fetcher
+.PHONY: dev-build-frontend
+dev-build-frontend:
+	nix-build --arg env-file ./env/dev/docker.env -o results/frontend -A ghcjs.frontend
+	# nix-shell --arg env-file ./env/dev/docker.env -A shells.ghcjs default.nix --run \
+	# 	"cabal --project-file=cabal-ghcjs.project --builddir=dist-ghcjs build frontend && cabal --project-file=cabal-ghcjs.project --builddir=dist-ghcjs --installdir=./results/frontend/ install frontend"
 
 .PHONY: docker-backend
 docker-backend:
-	${NIXBUILD} -o results/docker-backend nix/docker/diarios-backend.nix
+	${NIXBUILD_DOCKER} -o results/docker-backend nix/docker/diarios-backend.nix
 	docker load -i results/docker-backend
-	@echo "Imagem Docker do backend criada e carregada. Esta imagem inicializa o backend do Buscador Web"
 
 .PHONY: docker-fetcher
 docker-fetcher:
-	${NIXBUILD} -o results/docker-fetcher nix/docker/diarios-fetcher.nix
+	${NIXBUILD_DOCKER} -o results/docker-fetcher nix/docker/diarios-fetcher.nix
 	docker load -i results/docker-fetcher
-	@echo "Imagem Docker do Fetcher de diários criada e carregada"
 
 .PHONY: docker-postgresql
 docker-postgresql:
-	${NIXBUILD} -o results/docker-postgresql nix/docker/postgresql.nix
+	${NIXBUILD_DOCKER} -o results/docker-postgresql nix/docker/postgresql.nix
 	docker load -i results/docker-postgresql
-	@echo "Imagem Docker do serviço postgresql criada e carregada. Esta imagem inicializa o PostgreSQL"
-
-.PHONY: docker-db-history-update
-docker-db-history-update:
-	${NIXBUILD} -o results/docker-db-history-update nix/docker/db-history-update.nix
-	docker load -i results/docker-db-history-update
-	@echo "Imagem Docker do aplicador de migrações do DB criada e carregada."
 
 .PHONY: docker-all
-docker-all: docker-backend docker-fetcher docker-postgresql docker-db-history-update
+docker-all: docker-backend docker-fetcher docker-postgresql
 
-.PHONY: run-production
-run-production:
+.PHONY: nix-build-frontend
+nix-build-frontend:
+	nix-build --arg env-file ./env/prod/docker.env -o results/frontend -A ghcjs.frontend
+
+.PHONY: nix-build-backend
+nix-build-backend:
+	nix-build --arg env-file ./env/prod/docker.env -o results/backend -A ghc-static.backend
+
+.PHONY: nix-build-diarios-fetcher
+nix-build-diarios-fetcher:
+	nix-build --arg env-file ./env/prod/docker.env -o results/diarios-fetcher -A ghc-static.diarios-fetcher
+
+.PHONY: run-certbot
+run-certbot:
+	./scripts/run-certbot.sh
+
+.PHONY: simul-prod
+simul-prod:
+	docker-compose -f docker-compose.simul-prod.yaml down
 	pg_ctl stop || true
-	@echo "Isso irá inicializar as imagens Docker da forma mais parecida possível com o que se faz em Produção"
-	docker-compose up || true
-	pg_ctl start
-
-build-all: nix-build-backend nix-build-frontend nix-build-diarios-fetcher
+	pkill -x pebble || true
+	docker-compose -f docker-compose.simul-prod.yaml up
 
 .PHONY: ghcid-frontend
 ghcid-frontend:
@@ -77,7 +75,7 @@ ghcid-fetcher:
 
 hoogle:
 	hoogle server --local --port=8000 2>/dev/null 1>/dev/null &
-	xdg-open http://localhost:8000/
+	xdg-open http://localhost:8000/ 2>/dev/null 1>/dev/null &
 
 fetch:
 	cabal new-run diarios-fetcher-exe -- +RTS -M4096m -RTS fetch
@@ -85,12 +83,3 @@ fetch:
 profile-diarios:
 	cabal new-build --enable-profiling diarios-fetcher-exe
 	cabal new-run diarios-fetcher-exe -- +RTS -4096m -p -T -RTS fetch
-
-db-restart:
-	dropdb -U postgres --if-exists ${PGDATABASE}
-	make db-update
-
-db-update:
-	./scripts/bootstrap-db.sh
-	# TODO: Aplicar todas as migrações numa única transação (aplicação pós-deploy precisa de todas ou o deploy deve falhar)
-	find db-history -name '*.sql' | sort | xargs -L 1 ./scripts/aplicar-migracao.sh

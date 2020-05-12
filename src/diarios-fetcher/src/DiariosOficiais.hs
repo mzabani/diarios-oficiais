@@ -7,6 +7,7 @@ import DiariosOficiais.Crawling
 import DiariosOficiais.Database
 import RIO
 import UnliftIO.Environment
+import DbVcs (bringDbUpToDate)
 import Data.Time
 import Data.Pool
 import qualified Database.PostgreSQL.Simple as PGS
@@ -27,11 +28,8 @@ import Network.HTTP.Conduit
 import qualified PdfParser.HtmlParser as PP
 import qualified PdfParser.Estruturas as PP
 import Buscador
-import AwsUtils
-import qualified Aws
 import qualified Data.Foldable as Fold
 import qualified Crawlers.Campinas as CrawlerCampinas
-import qualified Crawlers.Sumare as CrawlerSumare
 import qualified Data.Text as T
 import qualified Data.Aeson as Aeson
 
@@ -78,14 +76,17 @@ start = do
   let mgrSettings = Http.tlsManagerSettings { Http.managerModifyRequest = \req -> return req { requestHeaders = [("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36")] } }
   mgr <- newManager mgrSettings
   basePath <- fromMaybe "./data/diarios-oficiais/" <$> lookupEnv "DIARIOSDIR"
+  dbVcsInfo <- getDbVcsInfo
+  -- Apply DB migrations if necessary
+  bringDbUpToDate dbVcsInfo
   bracket (createDbPool 1 60 50) destroyAllResources $ \dbPool -> do
     createDirectoryIfMissing False basePath
-    awsConfig <- createAwsConfiguration
+    -- awsConfig <- createAwsConfiguration
     let ctx = AppContext {
       mgr = mgr,
       dbPool = dbPool,
-      basePath = basePath,
-      awsConfig = awsConfig
+      basePath = basePath
+      -- awsConfig = awsConfig
     }
     hj <- hoje
     args <- getArgs
@@ -117,7 +118,7 @@ start = do
         liftIO $ putStrLn "\"c\" para início de Cabeçalho"
         liftIO $ putStrLn "\"s\" para sair (a opção de salvar ou não aparecerá em seguida)"
         liftIO $ putStrLn ""
-        matchingEsperado <- Process.withProcess (Process.shell $ "evince \"" ++ fullPath ++ "\"") $ \_ ->
+        matchingEsperado <- Process.withProcessWait (Process.shell $ "xdg-open \"" ++ fullPath ++ "\"") $ \_ ->
           forMUntilNothing binfos $ \binfo -> do
             let readMatch = liftIO getLine >>= \case
                                                         "m" -> return $ Just PP.DoMesmoParagrafo
@@ -145,8 +146,8 @@ start = do
 data AppContext = AppContext {
   mgr :: Manager,
   dbPool :: Pool PGS.Connection,
-  basePath :: String,
-  awsConfig :: Aws.Configuration
+  basePath :: String
+  -- awsConfig :: Aws.Configuration
 }
 
 -- | Baixa o diário e atualiza o banco de dados para torná-lo buscável

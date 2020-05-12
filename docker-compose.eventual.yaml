@@ -5,8 +5,7 @@ services:
       - ./env/docker.env
     image: diarios-fetcher
     volumes:
-      - ./data/diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
-      - ./keys:/keys
+      - ${DIARIOSDIR}:/home/diarios-fetcher/diarios-oficiais
     command: /bin/diarios-fetcher-exe fetch
     depends_on:
       - postgresql
