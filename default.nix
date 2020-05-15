@@ -1,12 +1,11 @@
-{ reflex-platform ? import ./nix/reflex-platform.git.nix
-, env-file }:
+{ reflex-platform ? import ./nix/reflex-platform.nix }:
 let
   pkgs = import ./nix/nixpkgs.nix;
   utils = import ./nix/utils.nix {};
   pdftohtml = import ./nix/packages/pdftohtml.nix {};
   nixpkgs = pkgs;
 
-  extraBuildInputs = [
+  shellPkgs = [
     pdftohtml
     pkgs.automake
     pkgs.docker-compose
@@ -14,6 +13,7 @@ let
     pkgs.certbot
     pkgs.pebble
     pkgs.procps
+    pkgs.openssh
   ];
 
   postgres-service = import ./nix/postgres-service.nix { postgres = pkgs.postgresql_12; runInBackground=true; inherit pkgs; };
@@ -46,18 +46,11 @@ let
   });
 in
   rec {
-    ghcjs = reflexProj.ghcjs // {
-      # Our frontend and backend are hosted on different servers, and Requests
-      # need to go to the right address according to the desired environment (Dev, Production etc.)
-      frontend = reflexProj.ghcjs.frontend.overrideAttrs (old: { BACKENDURL = utils.readDockerEnv "BACKENDURL" env-file; });
-    };
+    ghcjs = reflexProj.ghcjs;
 
-    ghc = reflexProj.ghc // {
-      diarios-fetcher = reflexProj.ghc.diarios-fetcher.overrideAttrs (old: {
-        buildInputs = old.buildInputs ++ [ pdftohtml ];
-      });
-    };
+    ghc = reflexProj.ghc;
 
+    # TODO: mapAttrs!
     ghc-static = ghc // {
       backend = pkgs.haskell.lib.justStaticExecutables ghc.backend;
       diarios-fetcher = pkgs.haskell.lib.justStaticExecutables ghc.diarios-fetcher;
@@ -67,10 +60,9 @@ in
       ghcjs = reflexProj.shells.ghcjs;
 
       ghc = reflexProj.shells.ghc.overrideAttrs (old: {
-        buildInputs = old.buildInputs ++ extraBuildInputs;
+        buildInputs = old.buildInputs ++ shellPkgs;
 
         shellHook = ''
-        # Do not source the supplied env-file because folders in places that don't exist might get created!!
         source scripts/source-env.sh ./env/dev/docker.env
         source scripts/source-env.sh ./env/local.env
         ${postgres-service}/bin/init-postgres

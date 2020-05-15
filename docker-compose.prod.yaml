@@ -6,14 +6,14 @@ services:
       - "443:8083"
     env_file:
       - ./env/prod/docker.env
-    image: diarios-oficiais-backend
+    image: mzabani/diarios-oficiais-backend
     depends_on:
       - postgresql
     restart: unless-stopped
   diarios-fetcher:
     env_file:
       - ./env/prod/docker.env
-    image: diarios-fetcher
+    image: mzabani/diarios-fetcher
     volumes:
       - ./diarios-oficiais:/home/diarios-fetcher/diarios-oficiais
     restart: always
@@ -23,7 +23,7 @@ services:
   postgresql:
     env_file:
       - ./env/prod/docker.env
-    image: postgresql
+    image: mzabani/postgresql
     volumes:
       - ./postgres-datadir:/home/postgres/postgres-datadir
     restart: unless-stopped

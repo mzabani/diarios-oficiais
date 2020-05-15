@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 import Data.Proxy
 import Control.Lens ((&), (%~), (.~))
 import Reflex.Dom
@@ -13,13 +11,6 @@ import Data.Text (Text)
 import Data.Time.Calendar
 import Control.Monad
 import Common
-import BuildEnv (getCompileEnvExp)
-
-servidor :: Text
-servidor = $(getCompileEnvExp "BACKENDURL")
-
-getUrl :: Text -> Text
-getUrl path = servidor <> path
 
 data Busca = NadaBuscado | Buscando Text | BuscaTerminada ResultadoBusca
 
@@ -28,7 +19,7 @@ search querySearchedEv = do
     let buscaIniciadaEv = Buscando <$> querySearchedEv
         resultadosChegaramEv = toBuscaTerminada <$> (decodeXhrResponse <$> responsesEv)
     holdDyn NadaBuscado (leftmost [buscaIniciadaEv, resultadosChegaramEv])
-    where toRequest termo = postJson (getUrl "/busca") (FormBusca termo)
+    where toRequest termo = postJson "/busca" (FormBusca termo)
           toBuscaTerminada Nothing = BuscaTerminada $ ErroBusca "Aconteceu um erro interno na desserialização. Por favor reporte isso como um Bug."
           toBuscaTerminada (Just res) = BuscaTerminada res
 
@@ -90,6 +81,7 @@ htmlBody = do
                     el "ul" $ do
                         el "li" $ text "Tente também \"habite-se diario:Campinas data>=2019-02-01\" para ver parágrafos com \"habite-se\" da cidade de Campinas a partir de 1º de fevereiro de 2019"
                         el "li" $ text "Tente também \"alvará deferido data>=2019-01-01 data<=2019-01-31 grupos:data\" para ver alvarás deferidos em todos diários oficiais disponíveis por data no mês de Janeiro/2019"
+                        el "li" $ text "Tente também \"covid\" para ver medidas públicas relacionadas ao Corona Vírus"
                 
                 dyn_ $ ffor resultadosDyn $ \case
                         NadaBuscado -> pure ()
