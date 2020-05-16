@@ -7,6 +7,7 @@ import Data.Text (Text)
 
 data FormBusca = FormBusca {
     buscaTermo :: Text
+    , buscaPagina :: Int
 } deriving (Generic, ToJSON, FromJSON)
 
 -- TODO: Indexar comprimento de colunas e valores para que sejam iguais!

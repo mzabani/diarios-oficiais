@@ -38,3 +38,4 @@ executable frontend
                     , RankNTypes
                     , ScopedTypeVariables
                     , AllowAmbiguousTypes
+                    , TupleSections
