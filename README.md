@@ -13,7 +13,7 @@
 1. Run `make fetch` to download the Diários Oficiais (Official Journals) or else there won't be anything to search for. You can stop fetching by typing Ctrl+C any time; no fetched journals will be lost when you do this.
 2. Run `make dev-build-frontend; cabal run backend`.
 3. Only if this is the very first time you typed `cabal run backend`, a TLS certificate will need to be acquired. Run `make run-certbot` in a separate development shell **without stopping the backend** and wait until it succeeds. Now you can kill the backend and run `cabal run backend` again.
-4. Go to 'https://localhost:8083/index.html' to test. Ignore any safety risks; they only exist because the certificate is a "toy" certificate, not signed by a trusted CA.
+4. Go to 'https://localhost:8083/' to test. Ignore any safety risks; they only exist because the certificate is a "toy" certificate, not signed by a trusted CA.
 
 ### 3. Simulating Production locally
 
@@ -22,8 +22,21 @@ Docker images are built for Deployment purposes. You can run it all locally in a
 1. You'll need Docker configured and running.
 2. `make docker-all` to build all Docker images and load them with docker automatically.
 3. `make simul-prod` to kill applications which are running locally (such as postgres and pebble) and start all the containers right away.
-4. Go to `https://localhost/index.html` in your Browser and ignore safety risks.
+4. Go to `https://localhost/` in your Browser and ignore safety risks.
 5. After you stop `docker-compose`, postgres and pebble won't be started for you. I recommend typing `exit` and `make shell` again to restore the environment.
+
+### 4. Deploying to Production
+
+If you want to run this app in your own instance, you can use some Container Orchestration solution with the produced Docker images, or you can set up a Toy
+Production server by (note that this is still a very rough guide, lots of other things need to be set up properly for this to work, such as DNS records for certbot):
+
+1. Edit `/env/prod/docker.env` and change hosts and other info to adapt it to your app.
+2. Create a Linux Cloud Compute instance somewhere. It could AWS, GCP, Azure or any other.
+3. Install `docker-compose` on that instance and make sure `sshd` is up and running ok. Make sure ports `80` and `443` are open to the Internet.
+4. Download the SSH keys necessary to log in and save them to your project's `/env/prod/secrets/LightsailDefaultKey-us-east-1.pem` file.
+5. Run `DOCKER_BUILD_ENV_FILE=./env/prod/docker.env make docker-all` to build Docker images for Production.
+6. Make sure you're registered at Docker Hub or some other Registry, edit `/scripts/push-to-docker-hub.sh` accordingly and run it.
+7. Run `./scripts/prepare-prod-cloud-instance.sh username@yourcloudinstance`. https://yourdomain/ should now be accessible.
 
 ### Treinar algoritmo de Machine Learning
 

@@ -9,6 +9,8 @@ import Servant
 import Servant.API
 import Servant.HTML.Blaze (HTML)
 import Network.Wai
+import WaiAppStatic.Storage.Filesystem (defaultWebAppSettings)
+import WaiAppStatic.Types (StaticSettings(..), unsafeToPiece)
 import ServantExtensions
 import Database.PostgreSQL.Simple (execute)
 import qualified Database.PostgreSQL.Simple as DB
@@ -37,11 +39,14 @@ type SinglePageAPI = "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON]
                 :<|> "ler" :> Capture "conteudoDiarioId" Int :> Get '[HTML] Blaze.Html
                 :<|> Raw
 
+staticFileSettings :: FilePath -> StaticSettings
+staticFileSettings frontendDir = (defaultWebAppSettings frontendDir) { ssIndices = [ unsafeToPiece "index.html" ] }
+
 singlePageServer :: FilePath -> Pool Connection -> Server SinglePageAPI
 singlePageServer frontendDir connectionPool = 
                              Busca.buscaPost connectionPool
                         :<|> Ler.lerDiario connectionPool
-                        :<|> serveDirectoryWebApp frontendDir
+                        :<|> serveDirectoryWith (staticFileSettings frontendDir)
 
 acmeChallengeServer :: FilePath -> Server AcmeChallengeAPI
 acmeChallengeServer acmeChallengePath = serveDirectoryWebApp acmeChallengePath

@@ -28,6 +28,7 @@ executable backend
                      , wai
                      , warp
                      , warp-tls
+                     , wai-app-static
                      , directory
                      , servant
                      , servant-server

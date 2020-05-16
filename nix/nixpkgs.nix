@@ -1,1 +1,1 @@
-(import ./reflex-platform.git.nix).nixpkgs
+(import ./reflex-platform.nix).nixpkgs
