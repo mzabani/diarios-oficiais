@@ -35,7 +35,7 @@ import qualified System.IO as IO
 
 type AcmeChallengeAPI = ".well-known" :> "acme-challenge" :> Raw
 
-type SinglePageAPI = "busca" :> ReqBody '[JSON] Common.FormBusca :> Post '[JSON] Common.ResultadoBusca
+type SinglePageAPI = "busca" :> QueryParam' '[Required] "q" Text :> QueryParam' '[Required] "p" Int :> Get '[JSON] Common.ResultadoBusca
                 :<|> "ler" :> Capture "conteudoDiarioId" Int :> Get '[HTML] Blaze.Html
                 :<|> Raw
 
@@ -44,7 +44,7 @@ staticFileSettings frontendDir = (defaultWebAppSettings frontendDir) { ssIndices
 
 singlePageServer :: FilePath -> Pool Connection -> Server SinglePageAPI
 singlePageServer frontendDir connectionPool = 
-                             Busca.buscaPost connectionPool
+                             Busca.buscaGet connectionPool
                         :<|> Ler.lerDiario connectionPool
                         :<|> serveDirectoryWith (staticFileSettings frontendDir)
 

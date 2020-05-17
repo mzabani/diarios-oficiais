@@ -62,6 +62,7 @@ data Consulta = Consulta {
     _select :: [Text]
     , _where :: [FiltroBusca]
     , _grupos :: [Text]
+    , _pagina :: Int
 }
 
 data OperadorSql = Igual | Menor | Maior | MenorIgual | MaiorIgual deriving Show
@@ -163,13 +164,15 @@ parseConsulta fb = do
                 Consulta {
                     _select = ["data", "diario", "paragrafo"],
                     _where = filtros,
-                    _grupos = []
+                    _grupos = [],
+                    _pagina = buscaPagina fb
                 }
         else
                 Consulta {
                     _select = colunasGrupos <> ["quantidade"],
                     _where = filtros,
-                    _grupos = colunasGrupos
+                    _grupos = colunasGrupos,
+                    _pagina = buscaPagina fb
                 }
 
 -- pgArrayToValor :: PGArray Text -> Valor
@@ -221,7 +224,8 @@ queryGrupos fb conn = case parseConsulta fb of
                     groupByClause = if not possuiAgrupamento then "" else "GROUP BY " <> intercalateQuery ", " groupables
                     orderByEmAgrupado = if not possuiAgrupamento then "" else "ORDER BY " <> (intercalateQuery ", " $ fmap (\(Selectable qf@(QueryFrag col _) _ _) -> if col == "dataDiario" then "dataDiario DESC" else qf) selectables)
 
-                    -- TODO: Fazer paginação
+                    limitClause = QueryFrag " LIMIT ? " (Only (20::Int))
+                    offsetClause = QueryFrag " OFFSET ? " $ Only ((_pagina consulta - 1) * 20)
 
                     customRowParser = createRowParser selectables
                     rowParserComAuxiliares = if not possuiAgrupamento then (\valores conteudoDiarioId qtd -> (valores, conteudoDiarioId, qtd)) <$> customRowParser <*> (field :: PgInternal.RowParser (Maybe Int)) <*> (field :: PgInternal.RowParser Int)
@@ -246,7 +250,9 @@ queryGrupos fb conn = case parseConsulta fb of
                                 <> " "
                                 <> "order by dataDiario desc, paragrafodiario.ordem "
                                 <> "), qtdResultados (qtd) as (select cast(count(*) as int) from resultados)"
-                                <> " select resultados.*, qtdResultados.qtd from resultados, qtdResultados limit 20"
+                                <> " select resultados.*, qtdResultados.qtd from resultados, qtdResultados "
+                                <> offsetClause
+                                <> limitClause
                         else
                                 "with " <> conteudosCte
                             <> " , resultados as (select " <> selectClause <> ", cast(count(*) as int) as qtdParagrafos"
@@ -259,7 +265,9 @@ queryGrupos fb conn = case parseConsulta fb of
                             <> " "
                             <> orderByEmAgrupado
                             <> "), qtdResultados (qtd) as (select cast(sum(qtdParagrafos) as int) from resultados)"
-                            <> " select resultados.*, qtdResultados.qtd from resultados, qtdResultados limit 20"
+                            <> " select resultados.*, qtdResultados.qtd from resultados, qtdResultados "
+                            <> offsetClause
+                            <> limitClause
                                 
                 liftIO $ Prelude.print query
                 liftIO $ (do
@@ -274,6 +282,6 @@ queryGrupos fb conn = case parseConsulta fb of
                     `UnsafeException.catch`
                     (\(e :: IOException) -> return $ ErroBusca "Há algo de errado com a consulta. Por favor modifique/corrija a consulta e tente novamente.")
 
-buscaPost :: Pool Connection -> FormBusca -> Servant.Handler ResultadoBusca
-buscaPost connPool fb =
-    withDbConnection connPool $ \conn -> queryGrupos fb conn
+buscaGet :: Pool Connection -> Text -> Int -> Servant.Handler ResultadoBusca
+buscaGet connPool q p =
+    withDbConnection connPool $ \conn -> queryGrupos (FormBusca q p) conn
