@@ -31,6 +31,14 @@ tshow = T.pack . show
 
 htmlHead :: Widget x ()
 htmlHead = do
+    -- Global site tag (gtag.js) - Google Analytics
+    elAttr "script" (Map.fromList [ ("async", ""), ("src", "https://www.googletagmanager.com/gtag/js?id=UA-166907630-1") ]) (pure ())
+    el "script" $ text $
+                        "window.dataLayer = window.dataLayer || [];\n"
+                        <> "function gtag(){dataLayer.push(arguments);}\n"
+                        <> "gtag('js', new Date());\n"
+                        <> "gtag('config', 'UA-166907630-1');"
+
     elAttr "meta" (Map.fromList [("charset", "utf-8")]) (pure ())
     elAttr "meta" (Map.fromList [("name", "viewport"), ("content", "width=device-width, initial-scale=1, shrink-to-fit=no")]) (pure ())
     elAttr "link" (Map.fromList [("rel", "stylesheet"), ("href", "https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"), ("integrity", "sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"), ("crossorigin", "anonymous")]) (pure ())

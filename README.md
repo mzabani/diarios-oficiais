@@ -36,7 +36,7 @@ Production server by (note that this is still a very rough guide, lots of other 
 4. Download the SSH keys necessary to log in and save them to your project's `/env/prod/secrets/LightsailDefaultKey-us-east-1.pem` file.
 5. Run `DOCKER_BUILD_ENV_FILE=./env/prod/docker.env make docker-all` to build Docker images for Production.
 6. Make sure you're registered at Docker Hub or some other Registry, edit `/scripts/push-to-docker-hub.sh` accordingly and run it.
-7. Run `./scripts/prepare-prod-cloud-instance.sh username@yourcloudinstance`. https://yourdomain/ should now be accessible.
+7. Run `./scripts/prepare-prod-cloud-instance.sh username@yourcloudinstance` and wait a minute. https://yourdomain/ should now be accessible and up to date.
 
 ### Treinar algoritmo de Machine Learning
 
