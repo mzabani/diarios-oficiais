@@ -88,10 +88,10 @@ start = do
       basePath = basePath
       -- awsConfig = awsConfig
     }
-    hj <- hoje
     args <- getArgs
     case args of
-      [ "fetch" ] ->
+      [ "fetch" ] -> do
+        hj <- hoje
         forM_ [0..365] $ \i -> do
           let dt = addDays ((-1) * i) hj
           Fold.forM_ allCrawlers $ \sub -> downloadEIndexar dt ctx sub
@@ -139,6 +139,7 @@ start = do
         return ()
       _ ->
         forever $ do
+          hj <- hoje
           forM_ allCrawlers $ downloadEIndexar hj ctx
           putStrLn "Diários baixados. Esperando 1 hora para baixar novamente."
           threadDelay (1000 * 1000 * 60 * 60) -- Espera 1 hora até tentar de novo

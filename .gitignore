@@ -1,10 +1,10 @@
 dist/
 dist-newstyle/
 dist-ghcjs/
-frontend-result
-data/
 results/
 env/prod/secrets
+env/dev/data
+env/simul-prod/data
 
 cabal-dev
 *.o

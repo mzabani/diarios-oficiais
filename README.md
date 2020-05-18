@@ -17,11 +17,11 @@
 
 ### 3. Simulating Production locally
 
-Docker images are built for Deployment purposes. You can run it all locally in a very similar fashion to what it's done in Production. In order to do that, follow the instructions below:
+Docker images are built for Deployment purposes. You can run it all locally in a very similar fashion to what is done in Production. In order to do that, follow the instructions below:
 
 1. You'll need Docker configured and running.
 2. `make docker-all` to build all Docker images and load them with docker automatically.
-3. `make simul-prod` to kill applications which are running locally (such as postgres and pebble) and start all the containers right away.
+3. `make simul-prod` to stop applications which are running locally (such as postgres and pebble) and start all the containers right away.
 4. Go to `https://localhost/` in your Browser and ignore safety risks.
 5. After you stop `docker-compose`, postgres and pebble won't be started for you. I recommend typing `exit` and `make shell` again to restore the environment.
 
@@ -33,10 +33,15 @@ Production server by (note that this is still a very rough guide, lots of other 
 1. Edit `/env/prod/docker.env` and change hosts and other info to adapt it to your app.
 2. Create a Linux Cloud Compute instance somewhere. It could AWS, GCP, Azure or any other.
 3. Install `docker-compose` on that instance and make sure `sshd` is up and running ok. Make sure ports `80` and `443` are open to the Internet.
-4. Download the SSH keys necessary to log in and save them to your project's `/env/prod/secrets/LightsailDefaultKey-us-east-1.pem` file.
+4. Download the SSH keys necessary to log in and save them to your project's `/env/prod/secrets/cloud-compute-ssh-key.pem` file.
 5. Run `DOCKER_BUILD_ENV_FILE=./env/prod/docker.env make docker-all` to build Docker images for Production.
 6. Make sure you're registered at Docker Hub or some other Registry, edit `/scripts/push-to-docker-hub.sh` accordingly and run it.
 7. Run `./scripts/prepare-prod-cloud-instance.sh username@yourcloudinstance` and wait a minute. https://yourdomain/ should now be accessible and up to date.
+
+### 5. Development environment
+
+- Run `make hoogle` to open a Browser with hoogle for locally generated Docs.
+- Run `make ghcid-backend` and `make ghcid-frontend` to help you see errors "real-time" while you develop.
 
 ### Treinar algoritmo de Machine Learning
 

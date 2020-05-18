@@ -2,36 +2,16 @@ module Busca where
 
 import RIO
 import qualified RIO.Char as Char
-import RIO.Map as Map
 import qualified Data.Text as Text
-import Database.Beam
-import Data.Aeson
-import qualified Data.List.NonEmpty as NonEmpty
-import Data.List.NonEmpty (NonEmpty(..))
 import Data.Time
-import Data.Maybe (catMaybes)
-import Data.Char (isSpace)
 import qualified Servant
-import Servant.API
-import Servant.HTML.Blaze
-import Database.Beam.Backend.SQL.BeamExtensions
-import qualified Database.Beam.Postgres as Pg
-import ServantExtensions
-import Network.Wai
-import Network.Wai.Handler.Warp
-import GHC.Generics
-import Web.FormUrlEncoded
 import qualified Data.Attoparsec.Text as Parsec
 import qualified Data.Attoparsec.Combinator as Parsec (lookAhead)
 import Database.PostgreSQL.Simple
 import Database.PostgreSQL.Simple.FromField
-import Database.PostgreSQL.Simple.ToField
-import Database.PostgreSQL.Simple.ToRow
-import Database.PostgreSQL.Simple.Types
 import Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.Internal as PgInternal
 import Data.Pool
-import Model.Diarios
 import BeamUtils
 import Common
 import qualified Control.Exception as UnsafeException
@@ -48,7 +28,7 @@ instance Semigroup QueryFrag where
     QueryFrag q1 p1 <> QueryFrag q2 p2 = QueryFrag (q1 <> q2) (p1 :. p2)
 
 runQueryWith :: MonadIO m => PgInternal.RowParser r -> Connection -> QueryFrag -> m [r]
-runQueryWith rowParser conn (QueryFrag query params) = liftIO $ queryWith rowParser conn query params
+runQueryWith rowParser conn (QueryFrag qry params) = liftIO $ queryWith rowParser conn qry params
 
 createRowParser :: [Selectable] -> PgInternal.RowParser [Valor]
 createRowParser s = do
@@ -188,7 +168,6 @@ queryGrupos fb conn = case parseConsulta fb of
     Left err -> return $ ErroBusca $ "Erro na consulta. " <> Text.drop (Text.length "Failed reading: ") (Text.pack err)
     Right consulta ->
         let 
-            comGroupBy = _grupos consulta /= []
             pegarSelectable = \case
                 "data"     -> Just $ Selectable "dataDiario" (ValorTexto . Text.pack . showGregorian) fromField
                 "diario"   -> Just $ Selectable "nomeDiario" ValorTexto fromField
@@ -229,7 +208,7 @@ queryGrupos fb conn = case parseConsulta fb of
 
                     customRowParser = createRowParser selectables
                     rowParserComAuxiliares = if not possuiAgrupamento then (\valores conteudoDiarioId qtd -> (valores, conteudoDiarioId, qtd)) <$> customRowParser <*> (field :: PgInternal.RowParser (Maybe Int)) <*> (field :: PgInternal.RowParser Int)
-                        else (\valores qtdParagrafos qtdTotal -> (valores, Nothing, qtdTotal)) <$> customRowParser <*> (field :: PgInternal.RowParser (Maybe Int)) <*> (field :: PgInternal.RowParser Int)
+                        else (\valores _ qtdTotal -> (valores, Nothing, qtdTotal)) <$> customRowParser <*> (field :: PgInternal.RowParser (Maybe Int)) <*> (field :: PgInternal.RowParser Int)
 
                     conteudosCte = "conteudosDiarios (origemDiarioId, diarioId, dataDiario, nomeDiario, conteudoDiarioId, rankingRecencia) as ("
                                 <> "    select diario.origemdiarioid, diario.id, diario.data, case when origemdiario.cidade is null then origemdiario.nomecompleto else origemdiario.cidade || '/' || origemdiario.estado end, dbcd.conteudodiarioid, rank() over (partition by diario.id, diario.data order by momentotermino desc) "
@@ -240,7 +219,7 @@ queryGrupos fb conn = case parseConsulta fb of
                                 <> "       join origemdiario on diario.origemdiarioid = origemdiario.id "
                                 <> "       order by diarioabaixar.diarioid, downloadterminado.momentotermino desc)"
                     
-                    pquery@(QueryFrag query _) = if not possuiAgrupamento then
+                    pquery@(QueryFrag finalQuery _) = if not possuiAgrupamento then
                                     "with " <> conteudosCte
                                 <> " , resultados as (select " <> selectClause <> ", conteudosDiarios.conteudoDiarioId"
                                 <> "       from paragrafodiario"
@@ -269,7 +248,7 @@ queryGrupos fb conn = case parseConsulta fb of
                             <> offsetClause
                             <> limitClause
                                 
-                liftIO $ Prelude.print query
+                liftIO $ Prelude.print finalQuery
                 liftIO $ (do
                     res <- runQueryWith rowParserComAuxiliares conn pquery
                     let qtdRes = case res of
@@ -280,7 +259,7 @@ queryGrupos fb conn = case parseConsulta fb of
                         , resultados = fmap (\(r, cid, _) -> (cid, r)) res
                     }))
                     `UnsafeException.catch`
-                    (\(e :: IOException) -> return $ ErroBusca "Há algo de errado com a consulta. Por favor modifique/corrija a consulta e tente novamente.")
+                    (\(_ :: IOException) -> return $ ErroBusca "Há algo de errado com a consulta. Por favor modifique/corrija a consulta e tente novamente.")
 
 buscaGet :: Pool Connection -> Text -> Int -> Servant.Handler ResultadoBusca
 buscaGet connPool q p =

@@ -9,7 +9,7 @@ if [ ! -f "$CERTKEYPATH" ] && [ ! -f "$CERTPATH" ]; then
     mkdir -p $BACKEND_STATIC_FILES_PATH
     $1
     echo "certbot has run, killing and restarting the backend now"
-    pkill -x backend
+    pkill -x "$2"
     echo "Killed backend process. Waiting a bit to make sure listen port will be available"
     sleep 5
 fi

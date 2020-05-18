@@ -23,7 +23,6 @@ $ curl -X POST localhost:9876/dog -v
 module ServantExtensions where
 
 import GHC.TypeLits
-import Network.Wai.Handler.Warp
 import Servant
 
 type PostRedirect (code :: Nat) loc

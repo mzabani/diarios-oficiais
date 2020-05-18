@@ -50,11 +50,7 @@ in
 
     ghc = reflexProj.ghc;
 
-    # TODO: mapAttrs!
-    ghc-static = ghc // {
-      backend = pkgs.haskell.lib.justStaticExecutables ghc.backend;
-      diarios-fetcher = pkgs.haskell.lib.justStaticExecutables ghc.diarios-fetcher;
-    };
+    ghc-static = builtins.mapAttrs (k: pkgs.haskell.lib.justStaticExecutables) ghc;
     
     shells = {
       ghcjs = reflexProj.shells.ghcjs;

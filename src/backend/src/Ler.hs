@@ -2,12 +2,8 @@ module Ler where
 
 import RIO
 import Servant
-import Servant.API
 import qualified Data.Text as T
 import qualified Text.Blaze.Html5 as Blaze
--- import qualified Text.Blaze as Blaze
-import Network.Wai
-import Network.Wai.Handler.Warp
 import Database.PostgreSQL.Simple
 import Data.Pool
 import BeamUtils
