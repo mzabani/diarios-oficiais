@@ -1,7 +1,7 @@
 { env-file, local-sql-migrations-dir }:
 let
   pkgs = import ../nixpkgs.nix;
-  env = import ../../default.nix { inherit env-file; };
+  env = import ../../default.nix { };
   utils = import ../utils.nix {};
   sql-migrations-dir = utils.readDockerEnv "SQL_MIGRATIONS_DIR" env-file;
   frontend-dir = utils.readDockerEnv "FRONTEND_DIR" env-file;
@@ -25,12 +25,12 @@ in pkgs.dockerTools.buildImage {
     chmod a+rwx /tmp
 
     mkdir ${sql-migrations-dir}
-    chown diarios-backend.diarios-backend ${sql-migrations-dir}
     cp ${local-sql-migrations-dir}/*.sql ${sql-migrations-dir}
+    chown diarios-backend.diarios-backend ${sql-migrations-dir}
 
     mkdir ${frontend-dir}
-    chown diarios-backend.diarios-backend ${frontend-dir}
     cp ${frontend}/bin/frontend.jsexe/* ${frontend-dir}
+    chown diarios-backend.diarios-backend ${frontend-dir}
   '';
 
   config = {

@@ -72,7 +72,7 @@ htmlBody = do
                 (form, (resultadosDyn, pgAtualDyn)) <- formPreventDefault $ do
                     divClass "mx-auto col-sm-12 col-md-8 col-lg-4" $ mdo
                         divClass "input-group" $ mdo
-                            input <- inputElement def
+                            input <- inputElement $ def & inputElementConfig_elementConfig %~ elementConfig_initialAttributes .~ Map.fromList [("autofocus", "")]
                             pgAtualDyn <- holdDyn 1 pgClickEv
                             let formSubmitEv = domEvent Submit form
                                 searchFields = zipDyn (_inputElement_value input) pgAtualDyn

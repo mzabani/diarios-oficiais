@@ -10,6 +10,8 @@ services:
     depends_on:
       - postgresql
       - pebble
+    volumes:
+      - ./env/simul-prod/data/certbot/:/home/diarios-backend/certbot/
     restart: unless-stopped
   diarios-fetcher:
     env_file:
@@ -42,6 +44,5 @@ services:
     image: containrrr/watchtower:0.3.11
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /root/.docker/config.json:/config.json
     command: --interval 30
     restart: unless-stopped

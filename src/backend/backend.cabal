@@ -17,6 +17,7 @@ cabal-version:       >=1.10
 
 executable backend
   main-is:             Main.hs
+  ghc-options:         -Wall -O2 -threaded "-with-rtsopts=-N"
   other-modules:       ServantExtensions
                      , Busca
                      , Ler
