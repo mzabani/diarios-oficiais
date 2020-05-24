@@ -12,16 +12,16 @@ instance Database be DiariosDb
 diariosDb :: DatabaseSettings be DiariosDb
 diariosDb = defaultDbSettings `withDbModification`
             dbModification {
-                origensDiarios  = modifyTable (const "origemdiario") tableModification,
-                diarios         = modifyTable (const "diario") (tableModification { diarioOrigemDiarioId = OrigemDiarioId "origemdiarioid" }),
-                statusDownloads = modifyTable (const "statusdownloaddiario") (tableModification { statusdownloaddiarioDiarioABaixarId = DiarioABaixarId "diarioabaixarid", statusdownloaddiarioInicioDownload = "iniciodownload" }),
-                diariosABaixar = modifyTable (const "diarioabaixar") tableModification { diarioabaixarDiarioId = DiarioId "diarioid", diarioabaixarInicioDownload = "iniciodownload" },
-                conteudosDiarios = modifyTable (const "conteudodiario") tableModification { conteudodiarioMd5Sum = "md5sum" },
-                downloadsTerminados = modifyTable (const "downloadterminado") tableModification { downloadterminadoStatusDownloadDiarioId = StatusDownloadDiarioId "statusdownloaddiarioid", downloadterminadoMomentoTermino = "momentotermino", downloadterminadoMd5Sum = "md5sum", downloadterminadoFilePath = "filepath" },
-                diariosABaixarToConteudosDiarios = modifyTable (const "diarioabaixartoconteudodiario") tableModification { diarioabaixartoconteudodiarioDiarioABaixarId = DiarioABaixarId "diarioabaixarid", diarioabaixartoconteudodiarioConteudoDiarioId = ConteudoDiarioId "conteudodiarioid" },
-                paragrafosDiarios = modifyTable (const "paragrafodiario") tableModification { paragrafodiarioConteudoDiarioId = ConteudoDiarioId "conteudodiarioid", paragrafodiarioConteudo = "conteudo" },
-                nomesEncontrados = modifyTable (const "nomeencontrado") tableModification { nomeencontradoConteudoDiarioId = ConteudoDiarioId "conteudodiarioid", nomeencontradoLoweredNome = "lowerednome", nomeencontradoPosicao = "posicao" },
-                tokensTextoTbl = modifyTable (const "tokens_texto") tableModification { tokentextoConteudoDiarioId = ConteudoDiarioId "conteudo_diario_id" }
+                origensDiarios  = modifyEntityName (const "origemdiario") <> modifyTableFields tableModification,
+                diarios         = modifyEntityName (const "diario") <> modifyTableFields tableModification { diarioOrigemDiarioId = OrigemDiarioId "origemdiarioid" },
+                statusDownloads = modifyEntityName (const "statusdownloaddiario") <> modifyTableFields tableModification { statusdownloaddiarioDiarioABaixarId = DiarioABaixarId "diarioabaixarid", statusdownloaddiarioInicioDownload = "iniciodownload" },
+                diariosABaixar = modifyEntityName (const "diarioabaixar") <> modifyTableFields tableModification { diarioabaixarDiarioId = DiarioId "diarioid", diarioabaixarInicioDownload = "iniciodownload" },
+                conteudosDiarios = modifyEntityName (const "conteudodiario") <> modifyTableFields tableModification { conteudodiarioMd5Sum = "md5sum" },
+                downloadsTerminados = modifyEntityName (const "downloadterminado") <> modifyTableFields tableModification { downloadterminadoStatusDownloadDiarioId = StatusDownloadDiarioId "statusdownloaddiarioid", downloadterminadoMomentoTermino = "momentotermino", downloadterminadoMd5Sum = "md5sum", downloadterminadoFilePath = "filepath" },
+                diariosABaixarToConteudosDiarios = modifyEntityName (const "diarioabaixartoconteudodiario") <> modifyTableFields tableModification { diarioabaixartoconteudodiarioDiarioABaixarId = DiarioABaixarId "diarioabaixarid", diarioabaixartoconteudodiarioConteudoDiarioId = ConteudoDiarioId "conteudodiarioid" },
+                paragrafosDiarios = modifyEntityName (const "paragrafodiario") <> modifyTableFields tableModification { paragrafodiarioConteudoDiarioId = ConteudoDiarioId "conteudodiarioid", paragrafodiarioConteudo = "conteudo" },
+                nomesEncontrados = modifyEntityName (const "nomeencontrado") <> modifyTableFields tableModification { nomeencontradoConteudoDiarioId = ConteudoDiarioId "conteudodiarioid", nomeencontradoLoweredNome = "lowerednome", nomeencontradoPosicao = "posicao" },
+                tokensTextoTbl = modifyEntityName (const "tokens_texto") <> modifyTableFields tableModification { tokentextoConteudoDiarioId = ConteudoDiarioId "conteudo_diario_id" }
             }
 
 data OrigemDiarioT f = OrigemDiario {

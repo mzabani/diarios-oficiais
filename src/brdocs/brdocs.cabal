@@ -1,6 +1,6 @@
 name:                brdocs
 version:             0.1.0.0
-synopsis:            Projeto de parsing de documentos e outros números de registro brasileiros
+synopsis:            Projeto de parsing de identidades e outros números de registro brasileiros
 description:         Please see README.md
 homepage:            https://github.com/mzabani/brdocs#readme
 license:             BSD3
