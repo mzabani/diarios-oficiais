@@ -26,6 +26,8 @@ type AcmeChallengeAPI = ".well-known" :> "acme-challenge" :> Raw
 
 type SinglePageAPI = "busca" :> QueryParam' '[Required] "q" Text :> QueryParam' '[Required] "p" Int :> Get '[JSON] Common.ResultadoBusca
                 :<|> "ler" :> Capture "conteudoDiarioId" Int :> Get '[HTML] Blaze.Html
+                :<|> "listar-paragrafos-anteriores" :> Capture "paragrafoId" Int :> Get '[JSON] (Int, [(Int, Text)])
+                :<|> "listar-paragrafos-posteriores" :> Capture "paragrafoId" Int :> Get '[JSON] (Int, [(Int, Text)])
                 :<|> Raw
 
 staticFileSettings :: FilePath -> StaticSettings
@@ -35,6 +37,8 @@ singlePageServer :: FilePath -> Pool Connection -> Server SinglePageAPI
 singlePageServer frontendDir connectionPool = 
                              Busca.buscaGet connectionPool
                         :<|> Ler.lerDiario connectionPool
+                        :<|> Ler.lerParagrafosAntes connectionPool
+                        :<|> Ler.lerParagrafosDepois connectionPool
                         :<|> serveDirectoryWith (staticFileSettings frontendDir)
 
 acmeChallengeServer :: FilePath -> Server AcmeChallengeAPI

@@ -207,7 +207,7 @@ queryGrupos fb conn = case parseConsulta fb of
                     offsetClause = QueryFrag " OFFSET ? " $ Only ((_pagina consulta - 1) * 20)
 
                     customRowParser = createRowParser selectables
-                    rowParserComAuxiliares = if not possuiAgrupamento then (\valores conteudoDiarioId qtd -> (valores, conteudoDiarioId, qtd)) <$> customRowParser <*> (field :: PgInternal.RowParser (Maybe Int)) <*> (field :: PgInternal.RowParser Int)
+                    rowParserComAuxiliares = if not possuiAgrupamento then (\valores paragrafoId qtd -> (valores, paragrafoId, qtd)) <$> customRowParser <*> (field :: PgInternal.RowParser (Maybe Int)) <*> (field :: PgInternal.RowParser Int)
                         else (\valores _ qtdTotal -> (valores, Nothing, qtdTotal)) <$> customRowParser <*> (field :: PgInternal.RowParser (Maybe Int)) <*> (field :: PgInternal.RowParser Int)
 
                     conteudosCte = "conteudosDiarios (origemDiarioId, diarioId, dataDiario, nomeDiario, conteudoDiarioId, rankingRecencia) as ("
@@ -221,7 +221,7 @@ queryGrupos fb conn = case parseConsulta fb of
                     
                     pquery@(QueryFrag finalQuery _) = if not possuiAgrupamento then
                                     "with " <> conteudosCte
-                                <> " , resultados as (select " <> selectClause <> ", conteudosDiarios.conteudoDiarioId"
+                                <> " , resultados as (select " <> selectClause <> ", paragrafodiario.id"
                                 <> "       from paragrafodiario"
                                 <> "       join conteudosDiarios on conteudosDiarios.conteudoDiarioId=paragrafodiario.conteudoDiarioId and conteudosDiarios.rankingRecencia=1"
                                 <> " "
