@@ -63,23 +63,20 @@ simul-prod:
 
 .PHONY: ghcid-frontend
 ghcid-frontend:
-	ghcid -W -c "cabal new-repl frontend --disable-optimization"
+	ghcid -W -c "cabal repl frontend --disable-optimization"
 
 .PHONY: ghcid-backend
 ghcid-backend:
-	ghcid -W -c "cabal new-repl backend --disable-optimization"
+	ghcid -W -c "cabal repl backend --disable-optimization"
 
 .PHONY: ghcid-fetcher
 ghcid-fetcher:
-	ghcid -W -c "cabal new-repl diarios-fetcher --disable-optimization"
+	ghcid -W -c "cabal repl diarios-fetcher --disable-optimization"
 
 hoogle:
 	hoogle server --local --port=8000 2>/dev/null 1>/dev/null &
 	xdg-open http://localhost:8000/ 2>/dev/null 1>/dev/null &
 
-fetch:
-	cabal new-run diarios-fetcher-exe -- +RTS -M4096m -RTS fetch
-
 profile-diarios:
-	cabal new-build --enable-profiling diarios-fetcher-exe
-	cabal new-run diarios-fetcher-exe -- +RTS -4096m -p -T -RTS fetch
+	cabal build --enable-profiling diarios-fetcher-exe
+	cabal run diarios-fetcher-exe -- +RTS -4096m -p -T -RTS fetch 2019-01-02 2019-01-03

@@ -95,7 +95,7 @@ htmlBody = do
                             pgAtualDyn <- holdDyn 1 pgClickEv
                             let formSubmitEv = domEvent Submit form
                                 searchFields = zipDyn (_inputElement_value input) pgAtualDyn
-                                querySearchedEv = tag (current searchFields) $ leftmost [ formSubmitEv, () <$ updated pgAtualDyn ]
+                                querySearchedEv = tagPromptlyDyn searchFields $ leftmost [ formSubmitEv, () <$ updated pgAtualDyn ]
                             resultadosDyn <- search querySearchedEv
                             let buscandoEv = fmap (\case Buscando _ -> True
                                                          _          -> False) $ updated resultadosDyn
@@ -142,8 +142,8 @@ htmlBody = do
                                     forM_ colunaParagrafo $ \v -> el "td" $ do
                                         case mParagrafoId of
                                             Just paragrafoId -> mdo
-                                                carregarAnterioresClickEv <- elClass "p" "text-center" $ btnClass "btn btn-link" never $ text "Carregar parágrafos anteriores"
-                                                paragrafosAnterioresDyn <- traceDynWith show <$> listarParagrafos "/listar-paragrafos-anteriores/" (tag (current pidMaisAntigoDyn) carregarAnterioresClickEv)
+                                                carregarAnterioresClickEv <- elClass "p" "text-center" $ btnClass "btn btn-link" never $ el "small" $ text "Carregar parágrafos anteriores"
+                                                paragrafosAnterioresDyn <- listarParagrafos "/listar-paragrafos-anteriores/" (tag (current pidMaisAntigoDyn) carregarAnterioresClickEv)
                                                 paragrafosPosterioresDyn <- listarParagrafos "/listar-paragrafos-posteriores/" (tag (current pidMaisRecenteDyn) carregarPosterioresClickEv)
                                                 pidMaisAntigoDyn <- holdDyn paragrafoId $ fforMaybe (updated paragrafosAnterioresDyn) $ \case
                                                         SemListar -> Nothing
@@ -178,7 +178,7 @@ htmlBody = do
                                                 dyn_ $ todosParagrafosAnterioresDyn <&> \(_, ps) -> forM_ ps (\t -> el "p" $ text t)
                                                 el "p" $ renderValor v
                                                 dyn_ $ todosParagrafosPosterioresDyn <&> \(_, ps) -> forM_ ps (\t -> el "p" $ text t)
-                                                carregarPosterioresClickEv <- elClass "p" "text-center" $ btnClass "btn btn-link" never $ text "Carregar parágrafos posteriores"
+                                                carregarPosterioresClickEv <- elClass "p" "text-center" $ btnClass "btn btn-link" never $ el "small" $ text "Carregar parágrafos posteriores"
                                                 return ()
                                             Nothing -> renderValor v
 

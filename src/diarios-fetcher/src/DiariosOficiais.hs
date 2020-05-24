@@ -72,7 +72,7 @@ forMUntilNothing (x:xs) f = f x >>= \case
 
 start :: IO ()
 start = do
-  putStrLn "Passe a opção \"fetch\" para baixar todos os diários dos últimos 365 dias e não passe opção nenhuma para baixar continuamente diários"
+  putStrLn "Passe a opção \"fetch yyyy-mm-dd yyyy-mm-dd\" para baixar todos os diários entre as duas datas fornecidas (inclusive) e não passe opção nenhuma para baixar continuamente diários"
   let mgrSettings = Http.tlsManagerSettings { Http.managerModifyRequest = \req -> return req { requestHeaders = [("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36")] } }
   mgr <- newManager mgrSettings
   basePath <- fromMaybe "./data/diarios-oficiais/" <$> lookupEnv "DIARIOSDIR"
@@ -90,11 +90,15 @@ start = do
     }
     args <- getArgs
     case args of
-      [ "fetch" ] -> do
-        hj <- hoje
-        forM_ [0..365] $ \i -> do
-          let dt = addDays ((-1) * i) hj
-          Fold.forM_ allCrawlers $ \sub -> downloadEIndexar dt ctx sub
+      [ "fetch", sd1, sd2 ] -> do
+        let
+          md1 :: Maybe Day = parseTimeM True defaultTimeLocale "%F" sd1
+          md2 = parseTimeM True defaultTimeLocale "%F" sd2
+        case (md1, md2) of
+          (Just d1, Just d2) ->
+            forM_ [min d1 d2 .. max d1 d2] $ \dt ->
+              Fold.forM_ allCrawlers $ \sub -> downloadEIndexar dt ctx sub
+          _ -> putStrLn "Ao usar o fetch, certifique-se de fornecer duas datas em formato yyyy-mm-dd"
 
       [ "reindexar" ] ->
         error "Precisamos ser capazes de ler os PDFs originais e reinserir os parágrafos deles sem baixá-los dos sites!"

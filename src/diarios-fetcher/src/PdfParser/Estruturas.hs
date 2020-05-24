@@ -3,6 +3,7 @@ module PdfParser.Estruturas where
 import RIO
 import qualified RIO.Text as Text
 import qualified RIO.List as List
+import qualified Data.DList as DList
 import Data.Char (isDigit, isLetter, isUpper)
 import qualified Text.RE.TDFA.Text as RE
 import qualified Data.Text as Text (splitOn, breakOn)
@@ -25,9 +26,9 @@ class Attrs a where
     makeAttrs :: forall s v. (Eq s, IsString s, IsString v, StringConv v Text) => [(s, v)] -> a
 
 data AttrsBloco = AttrsBloco {
-    fontSizeBloco :: Maybe Int,
-    left :: Maybe Int,
-    top :: Maybe Int
+    fontSizeBloco :: !(Maybe Int),
+    left :: !(Maybe Int),
+    top :: !(Maybe Int)
 } deriving (Show, Eq)
 instance Attrs AttrsBloco where
     fontSize = fmap fromIntegral . fontSizeBloco
@@ -47,7 +48,7 @@ instance Attrs AttrsBloco where
     }
 
 data AttrsInline = AttrsInline {
-    fontSizeInline :: Maybe Int
+    fontSizeInline :: !(Maybe Int)
 } deriving (Show, Eq)
 instance Attrs AttrsInline where
     fontSize = fmap fromIntegral . fontSizeInline
@@ -67,17 +68,17 @@ readPx :: Text -> Maybe Int
 readPx = readMaybe . takeWhile isDigit . Text.unpack
 
 data Page = Page {
-    pageBlocos :: [Bloco]
+    pageBlocos :: ![Bloco]
 } deriving Show
 
-data Bloco = Bloco AttrsBloco (Either [TextEl] [Bloco]) deriving Show
+data Bloco = Bloco !AttrsBloco !(Either [TextEl] [Bloco]) deriving Show
 
 atributosBloco :: Bloco -> AttrsBloco
 atributosBloco (Bloco a _) = a
 
 data TextEl = TextEl {
-    atributos :: AttrsInline,
-    texto :: Either Text [TextEl]
+    atributos :: !AttrsInline,
+    texto :: !(Either Text [TextEl])
 } deriving Show
 
 textoTel :: TextEl -> Text
@@ -160,18 +161,18 @@ avg l = case toList l of
     (x:xs) -> Just $ uncurry (\n d -> realToFrac n / d) $ List.foldl' (\(num, den) n -> (num + n, den + 1)) (x,1) xs
 
 data BlocoEInfo = BlocoEInfo {
-    infoBloco :: Bloco
-    , infoTexto :: Text
-    , infoTerminaComHifen :: Bool
-    , infoTerminaComPontoOuPontoEVirgula :: Bool
-    , infoPagina :: Int
-    , infoIndexNaPagina :: Int
-    , infoColuna :: Int
+    infoBloco :: !Bloco
+    , infoTexto :: !Text
+    , infoTerminaComHifen :: !Bool
+    , infoTerminaComPontoOuPontoEVirgula :: !Bool
+    , infoPagina :: !Int
+    , infoIndexNaPagina :: !Int
+    , infoColuna :: !Int
 } deriving Show
 
 data InfoDocumento = InfoDocumento {
-    docTamanhoMedioFonte :: Float
-    , docMediaAlturaLinha :: Float
+    docTamanhoMedioFonte :: !Float
+    , docMediaAlturaLinha :: !Float
 } deriving Show
 
 -- | Retorna os parágrafos todos separadinhos a partir das páginas
@@ -228,8 +229,8 @@ produzirDadosCompletos pgs =
         blocosInfos :: [BlocoEInfo]
         blocosInfos = case blocosEPgs of
             [] -> []
-            ((b1, _):xs) -> snd $
-                List.foldl' (\(ultimoBInfo, todosBInfos) (bAtual, pgAtual) ->
+            ((b1, _):xs) -> DList.toList $ snd $
+                List.foldl' (\(!ultimoBInfo, !todosBInfos) (!bAtual, !pgAtual) ->
                     let
                         a2 = atributosBloco bAtual
                         a1 = atributosBloco (infoBloco ultimoBInfo)                        
@@ -247,9 +248,9 @@ produzirDadosCompletos pgs =
                                 else 0
                         bAtualInfo = mkBlocoEInfo bAtual pgAtual pgIdx colIdx
                     in
-                        (bAtualInfo, todosBInfos <> [bAtualInfo])
+                        (bAtualInfo, DList.snoc todosBInfos bAtualInfo)
                     )
-                    (mkBlocoEInfo b1 0 0 0, [ mkBlocoEInfo b1 0 0 0 ])
+                    (mkBlocoEInfo b1 0 0 0, DList.singleton $ mkBlocoEInfo b1 0 0 0)
                     xs
 
     in
@@ -379,14 +380,14 @@ mkParagrafos binfos matchings =
                         textElsRaizDoBlocoComEspaco (Bloco _ (Right blcs)) = concatMap textElsRaizDoBlocoComEspaco blcs
                         
                         (ultimoParagrafo, paragrafosAnteriores) =
-                            List.foldl' (\(pEmConstrucao@(Paragrafo telsPConstr), todosPs) (bAtualInfo, matching) ->
+                            List.foldl' (\(!pEmConstrucao@(Paragrafo telsPConstr), !todosPs) (!bAtualInfo, !matching) ->
                                 let bAtual = infoBloco bAtualInfo
                                 in
                                 if matching == Cabecalho || matching == IniciaOutroParagrafo then
-                                        (Paragrafo (textElsRaizDoBlocoComEspaco bAtual), todosPs <> [pEmConstrucao])
+                                        (Paragrafo (textElsRaizDoBlocoComEspaco bAtual), DList.snoc todosPs pEmConstrucao)
                                 else
                                     (Paragrafo (telsPConstr <> textElsRaizDoBlocoComEspaco bAtual), todosPs))
-                                (Paragrafo (textElsRaizDoBlocoComEspaco (infoBloco b1)), [])
+                                (Paragrafo (textElsRaizDoBlocoComEspaco (infoBloco b1)), DList.empty)
                                 xs
                         in
-                            paragrafosAnteriores <> [ultimoParagrafo]
+                            DList.toList $ DList.snoc paragrafosAnteriores ultimoParagrafo
