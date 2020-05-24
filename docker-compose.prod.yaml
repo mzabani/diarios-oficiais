@@ -10,7 +10,7 @@ services:
     depends_on:
       - postgresql
     volumes:
-      - ./certbot:${CERTBOT_DIR}
+      - ./certbot:/home/diarios-backend/certbot/
     restart: unless-stopped
   diarios-fetcher:
     env_file:
