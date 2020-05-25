@@ -92,9 +92,13 @@ htmlBody = do
                     divClass "mx-auto col-sm-12 col-md-8 col-lg-4" $ mdo
                         divClass "input-group" $ mdo
                             input <- inputElement $ def & inputElementConfig_elementConfig %~ elementConfig_initialAttributes .~ Map.fromList [("autofocus", "")]
-                            pgAtualDyn <- holdDyn 1 pgClickEv
+                            pgAtualDyn <- holdDyn 1 $ leftmost [ pgClickEv, 1 <$ formSubmitEv ]
+                            
                             let formSubmitEv = domEvent Submit form
-                                searchFields = zipDyn (_inputElement_value input) pgAtualDyn
+                                queryStringEv = tagPromptlyDyn (_inputElement_value input) formSubmitEv
+                            queryStringDyn <- holdDyn "" queryStringEv
+                            let
+                                searchFields = zipDyn queryStringDyn pgAtualDyn
                                 querySearchedEv = tagPromptlyDyn searchFields $ leftmost [ formSubmitEv, () <$ updated pgAtualDyn ]
                             resultadosDyn <- search querySearchedEv
                             let buscandoEv = fmap (\case Buscando _ -> True
