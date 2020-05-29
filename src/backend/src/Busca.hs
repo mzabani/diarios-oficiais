@@ -57,7 +57,7 @@ operadorQueryFrag = \case
 data FiltroBusca = FiltroConteudo Text | FiltroDiario Text | FiltroData OperadorSql Text | AgruparPor [Text] deriving Show
 
 charDePalavra :: Char -> Bool
-charDePalavra c = Char.isAlpha c || Char.isDigit c || c /= '\\' && c /= '>' && c /= ':' && c /= '<' && c /= '=' && c/= ' '
+charDePalavra c = Char.isAlpha c || Char.isDigit c || c /= '\\' && c /= '>' && c /= ':' && c /= '<' && c /= '=' && c /= ' '
 
 parserPalavra :: Parsec.Parser Text
 parserPalavra = do
@@ -176,7 +176,7 @@ queryGrupos fb conn = case parseConsulta fb of
                 _          -> Nothing
             pegarFilterable = \case
                 FiltroConteudo s -> Just $ QueryFrag "paragrafodiario.portuguese_conteudo_tsvector @@ websearch_to_tsquery('portuguese', ?)" (Only s)
-                FiltroDiario   s -> Just $ QueryFrag "UNACCENT(nomeDiario) ILIKE ('%' || UNACCENT(?) || '%')" (Only s)
+                FiltroDiario   s -> Just $ QueryFrag "UNACCENT(nomeDiario) ILIKE ('%' || UNACCENT(?) || '%')" (Only (traceShowId s))
                 FiltroData  op s -> Just $ "dataDiario " <> operadorQueryFrag op <> QueryFrag "?" (Only s)
                 AgruparPor _     -> Just "true" -- TODO: GADT evitaria esse caso?
             pegarGroupable = \case

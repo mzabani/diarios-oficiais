@@ -36,5 +36,5 @@ instance IsCrawler CampinasCrawler where
             link <- getPageLink dt mgr
             case link of
                 Nothing -> return CrawlArquivoNaoExiste
-                Just l -> return $ CrawlDiarios [l]
+                Just l -> return $ CrawlDiarios [l] ProcessarPdf
     }

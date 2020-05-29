@@ -1,7 +1,6 @@
 module DiariosOficiais (start) where
 
 import Model.Diarios
-import Brdocs
 import BeamUtils
 import DiariosOficiais.Crawling
 import DiariosOficiais.Database
@@ -11,6 +10,7 @@ import DbVcs (bringDbUpToDate)
 import Data.Time
 import Data.Pool
 import qualified Database.PostgreSQL.Simple as PGS
+import qualified Database.PostgreSQL.Query as PQ
 import qualified Data.ByteString.Lazy as LBS
 import Control.Monad.Trans.Resource
 import System.Directory
@@ -23,20 +23,21 @@ import System.FilePath
 import Data.Conduit
 import Data.Conduit.Binary
 import Data.String.Conv
+import Control.Monad.Logger (runNoLoggingT)
 import Database.Beam
 import Network.HTTP.Conduit
+import UnliftIO.Async (pooledMapConcurrentlyN)
+import UnliftIO.Exception (catchAny)
 import qualified PdfParser.HtmlParser as PP
 import qualified PdfParser.Estruturas as PP
-import Buscador
 import qualified Data.Foldable as Fold
 import qualified Crawlers.Campinas as CrawlerCampinas
+import qualified Crawlers.DOU
 import qualified Data.Text as T
 import qualified Data.Aeson as Aeson
 
 allCrawlers :: [Crawler]
--- Só Campinas funciona por enquanto
---allCrawlers = [toCrawler CrawlerSumare.SumareCrawler, toCrawler CrawlerCampinas.CampinasCrawler, toCrawler CrawlersDOU.DOU1Crawler]
-allCrawlers = [toCrawler CrawlerCampinas.CampinasCrawler]
+allCrawlers = [toCrawler CrawlerCampinas.CampinasCrawler, toCrawler Crawlers.DOU.DOU1Crawler, toCrawler Crawlers.DOU.DOU2Crawler, toCrawler Crawlers.DOU.DOU3Crawler]
 
 hoje :: MonadIO m => m Day
 hoje = liftIO $ localDay . zonedTimeToLocalTime <$> getZonedTime
@@ -46,7 +47,7 @@ utcNow = liftIO $ zonedTimeToUTC <$> getZonedTime
 
 -- ^ Downloads the URL supplied and saves into the supplied directory, returning the full path of the saved file, whose
 -- name is the file's MD5 hash
-downloadToAsMd5 :: Text -> FilePath -> Manager -> IO (FilePath, Digest MD5)
+downloadToAsMd5 :: (MonadThrow m, MonadUnliftIO m, MonadIO m) => Text -> FilePath -> Manager -> m (FilePath, Digest MD5)
 downloadToAsMd5 url dir mgr = do
   req <- parseRequest $ toS url
   runResourceT $ do
@@ -55,8 +56,6 @@ downloadToAsMd5 url dir mgr = do
       (fileHash, tempPath) <- sealConduitT resSource $$+- (getZipSink $ (,) <$> ZipSink sinkHash <*> ZipSink (sinkHandleAndClose fileHandle >> return fp))
       let finalPath = dir </> show (fileHash :: Digest MD5)
       -- Importante: renameFile pode falhar caso destino esteja em outro disco. Por isso usamos copyFile!
-      liftIO $ print tempPath
-      liftIO $ print finalPath
       liftIO $ copyFile tempPath finalPath
       liftIO $ removeFile tempPath
       return (finalPath, fileHash)
@@ -72,14 +71,14 @@ forMUntilNothing (x:xs) f = f x >>= \case
 
 start :: IO ()
 start = do
-  putStrLn "Passe a opção \"fetch yyyy-mm-dd yyyy-mm-dd\" para baixar todos os diários entre as duas datas fornecidas (inclusive) e não passe opção nenhuma para baixar continuamente diários"
-  let mgrSettings = Http.tlsManagerSettings { Http.managerModifyRequest = \req -> return req { requestHeaders = [("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.86 Safari/537.36")] } }
+  putStrLn "Passe a opção \"fetch yyyy-mm-dd yyyy-mm-dd\" para baixar todos os diários ainda não baixados entre as duas datas fornecidas (inclusive) e não passe opção nenhuma para baixar continuamente diários"
+  let mgrSettings = Http.tlsManagerSettings { Http.managerModifyRequest = \req -> return req { requestHeaders = [("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36")] } }
   mgr <- newManager mgrSettings
   basePath <- fromMaybe "./data/diarios-oficiais/" <$> lookupEnv "DIARIOSDIR"
   dbVcsInfo <- getDbVcsInfo
   -- Apply DB migrations if necessary
   bringDbUpToDate dbVcsInfo
-  bracket (createDbPool 1 60 50) destroyAllResources $ \dbPool -> do
+  bracket (createDbPool 1 60 50) (destroyAllResources) $ \dbPool -> do
     createDirectoryIfMissing False basePath
     -- awsConfig <- createAwsConfiguration
     let ctx = AppContext {
@@ -95,10 +94,30 @@ start = do
           md1 :: Maybe Day = parseTimeM True defaultTimeLocale "%F" sd1
           md2 = parseTimeM True defaultTimeLocale "%F" sd2
         case (md1, md2) of
-          (Just d1, Just d2) ->
-            forM_ [min d1 d2 .. max d1 d2] $ \dt ->
-              Fold.forM_ allCrawlers $ \sub -> downloadEIndexar dt ctx sub
-          _ -> putStrLn "Ao usar o fetch, certifique-se de fornecer duas datas em formato yyyy-mm-dd"
+          (Just d1, Just d2) -> do
+            let
+              de = min d1 d2
+              ate = max d1 d2
+            datasEDiariosFaltando :: [(Day, OrigemDiarioId)] <- withDbConnection dbPool $ \conn ->
+              runNoLoggingT $ PQ.runPgMonadT conn $
+                PQ.pgQuery [PQ.sqlExp|
+                  with todasDatas (data) as (select (#{de}::date + (n || ' days')::interval)::date from generate_series(0, #{diffDays ate de}) n)
+                      , datasEOrigens (data, origemDiarioId) as (select data, id from todasDatas cross join origemdiario)
+                      , datasEOrigensBaixados (data, origemDiarioId) as (
+                              select distinct diario.data, diario.origemdiarioid
+                              from diario
+                              join diarioabaixar on diarioabaixar.diarioid=diario.id
+                              join statusdownloaddiario on statusdownloaddiario.diarioabaixarid=diarioabaixar.id
+                              join downloadterminado on downloadterminado.statusdownloaddiarioid=statusdownloaddiario.id
+                              join diarioabaixartoconteudodiario dbctcb on dbctcb.diarioabaixarid = diarioabaixar.id
+                              where not exists (select 1 from paragrafodiario where paragrafodiario.conteudodiarioid = dbctcb.conteudodiarioid))
+                      select datasEOrigens.data, datasEOrigens.origemdiarioid
+                        from datasEOrigens
+                        left join datasEOrigensBaixados using (data, origemDiarioId)
+                        where datasEOrigensBaixados.data is null|]
+            let datasECrawlersFaltando :: [(Day, Crawler)] = mapMaybe (\(dt, origemId) -> (dt,) <$> Fold.find ((== origemId) . crawlerOrigemDiarioId) allCrawlers) datasEDiariosFaltando
+            forM_ datasECrawlersFaltando $ \(dt, cr) -> downloadEIndexar dt ctx cr
+          _ -> liftIO $ putStrLn "Ao usar o fetch, certifique-se de fornecer duas datas em formato yyyy-mm-dd"
 
       [ "reindexar" ] ->
         error "Precisamos ser capazes de ler os PDFs originais e reinserir os parágrafos deles sem baixá-los dos sites!"
@@ -106,7 +125,7 @@ start = do
       [ "treinar", pdfFile ] -> do
         let fullPath = "data/diarios-oficiais" </> pdfFile
             resultadoPath = "treinamento" </> pdfFile <.> "json"
-        (infoDoc, binfos) <- either (error "Oops") id <$> PP.parsePdfDetalhado [fullPath]
+        (infoDoc, binfos) <- either id (error "Não foi possível ler o arquivo pdf") <$> PP.parseLinkBaixadoDetalhado ProcessarPdf [fullPath]
         whenM (liftIO $ doesFileExist resultadoPath) $ do
           resultadoEsperadoAtual <- fromMaybe (error "JSON inválido!") <$> Aeson.decodeFileStrict resultadoPath
           let matchingsAlgo = PP.mkMatching (infoDoc, binfos)
@@ -144,7 +163,9 @@ start = do
       _ ->
         forever $ do
           hj <- hoje
-          forM_ allCrawlers $ downloadEIndexar hj ctx
+          forM_ allCrawlers $ \sub -> do
+            catchAny (downloadEIndexar hj ctx sub) $ const $ do
+              liftIO $ putStrLn $ "Falha ao baixar diário " ++ toS (crawlerNome sub) ++ ", data " ++ show hj
           putStrLn "Diários baixados. Esperando 1 hora para baixar novamente."
           threadDelay (1000 * 1000 * 60 * 60) -- Espera 1 hora até tentar de novo
 
@@ -161,7 +182,7 @@ downloadEIndexar hj AppContext{..} sub = do
   liftIO $ Prelude.putStrLn $ "Baixando " ++ show sub ++ " da data " ++ show hj
   crawlRes <- findLinks sub hj mgr
   case crawlRes of
-    CrawlDiarios links -> do
+    CrawlDiarios links procConteudo -> do
       liftIO $ withDbConnection dbPool $ \conn -> do
         diarioABaixar <- withDbTransaction conn $ do
           diarioExistenteMaybe <- getDiarioNaData (crawlerOrigemDiarioId sub) hj conn
@@ -180,10 +201,8 @@ downloadEIndexar hj AppContext{..} sub = do
             diarioabaixarInicioDownload = val_ rightNow
           }
 
-        downloads <- forM (Prelude.zip [1..] links) $ \(ordem, l) -> do
-          downloadStart <- utcNow
-          statusDownload <- withDbTransaction conn $
-                              beamInsertReturningOrThrow conn (statusDownloads diariosDb)
+        downloadStart <- utcNow
+        statusDownloads <- withDbTransaction conn $ forM (Prelude.zip [1..] links) $ \(ordem, l) -> beamInsertReturningOrThrow conn (statusDownloads diariosDb)
                                               StatusDownloadDiario {
                                                   statusdownloaddiarioId = default_,
                                                   statusdownloaddiarioDiarioABaixarId = val_ $ primaryKey diarioABaixar,
@@ -191,27 +210,28 @@ downloadEIndexar hj AppContext{..} sub = do
                                                   statusdownloaddiarioOrdem = val_ ordem,
                                                   statusdownloaddiarioInicioDownload = val_ downloadStart
                                                 }
-          -- TODO: Erro de download -> atualizar banco com erro e disparar email
-          (pdfFilePath, md5) <- downloadToAsMd5 l basePath mgr
+        
+        downloads <- pooledMapConcurrentlyN 20 (\sd -> do
+          (contentsFilePath, md5) <- downloadToAsMd5 (statusdownloaddiarioUrl sd) basePath mgr
           downloadEnd <- utcNow
-          withDbTransaction conn $
+          -- Estamos em threads concorrentes => não use a mesma DB connection!
+          withDbConnection dbPool $ \newConn -> withDbTransaction newConn $
             beamInsertOrThrow conn (downloadsTerminados diariosDb) DownloadTerminado {
               downloadterminadoId = default_,
-              downloadterminadoStatusDownloadDiarioId = val_ $ primaryKey statusDownload,
+              downloadterminadoStatusDownloadDiarioId = val_ $ primaryKey sd,
               downloadterminadoMomentoTermino = val_ downloadEnd,
               downloadterminadoMd5Sum = val_ $ toS (show md5),
-              downloadterminadoFilePath = val_ $ toS pdfFilePath
+              downloadterminadoFilePath = val_ $ toS contentsFilePath
             }
-          return pdfFilePath
+          return contentsFilePath
+          ) statusDownloads
 
-        paragrafosDiario <- either (error "Erro de parsing!") id <$> PP.parsePdf downloads
+        liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ " baixado com " ++ show (length downloads) ++ " URLs baixadas. Persistindo hash do conteúdo do diário"
+        paragrafosDiario :: [Text] <- either (fmap PP.printParagrafo) id <$> PP.parseLinkBaixado procConteudo downloads
 
-        -- Aqui pegamos um md5sum de todo o conteúdo. Podemos pegar diretamente de "conteudoTextoPdf" pois aí mudanças
-        -- no conversor pdf -> texto irão ativar o código de mudança de conteúdo que vem depois
-        let conteudoTextoPdf = T.concat $ fmap PP.printParagrafo paragrafosDiario
-            conteudoMd5Sum = hash ((toS conteudoTextoPdf) :: ByteString) :: Digest MD5
+        -- Aqui pegamos um md5sum de todo o conteúdo.
+        let conteudoMd5Sum = hashFinalize $ hashUpdates (hashInit @MD5) $ fmap encodeUtf8 paragrafosDiario
             md5sumString   = show conteudoMd5Sum
-        -- writeFileUtf8 (basePath </> md5sumString <.> ".txt") conteudoTextoPdf
         conteudoDiario <- withDbTransaction conn $ do
           conteudoDiario <- beamInsertOrGet_ conn (conteudosDiarios diariosDb) ConteudoDiario {
             conteudodiarioId = default_,
@@ -227,45 +247,19 @@ downloadEIndexar hj AppContext{..} sub = do
         -- TODO: Tudo daqui pra baixo deveria ser uma função separada para que possa ser executada
         -- para diários antigos quando introduzimos novidades (e.g. mais tokens buscáveis)
         
+        liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ ": persistindo " ++ show (length paragrafosDiario) ++ " parágrafos"
         withDbTransaction_ conn $ do
           -- TODO: insertOnConflictUpdate ao invés de beamInsertOnNoConflict e apagar apenas parágrafos com ordem maior que o último (código comentado mais abaixo)
           beamDelete conn (paragrafosDiarios diariosDb) (\pd -> paragrafodiarioConteudoDiarioId pd ==. val_ (pk conteudoDiario))
-          forM_ (RIO.zip [0..] paragrafosDiario) $ \(i, paragrafo) -> do
+          forM_ (RIO.zip [0..] paragrafosDiario) $ \(i, htmlParagrafo) -> do
             beamInsertOnNoConflict conn (paragrafosDiarios diariosDb) ParagrafoDiario {
               paragrafodiarioId = default_,
               paragrafodiarioConteudoDiarioId = val_ $ pk conteudoDiario,
               paragrafodiarioOrdem = val_ i,
-              paragrafodiarioConteudo = val_ $ PP.printParagrafo paragrafo
+              paragrafodiarioConteudo = val_ htmlParagrafo
             }
-          -- let ordemUltimoParagrafo = RIO.length paragrafosDiario - 1
-          -- runDelete $ delete (paragrafosDiarios diariosDb) (\pd -> paragrafodiarioOrdem pd >. ordemUltimoParagrafo &&. paragrafodiarioConteudoDiarioId ==. pk conteudoDiario)
 
-          let (DocumentoDiario tokensEPosicoes) = parseConteudoDiario conteudoTextoPdf
-        
-          -- Inserção de tokens buscáveis de todos tipos que nos interessarem
-          beamDelete conn (tokensTextoTbl diariosDb) (\tt -> tokentextoConteudoDiarioId tt ==. val_ (pk conteudoDiario))
-          forM_ tokensEPosicoes $ \(pos, token) ->
-            case token of
-              TokenCpf (cpfTexto, cpf) ->
-                beamInsertOnNoConflict conn (tokensTextoTbl diariosDb) Model.Diarios.TokenTexto {
-                  tokentextoId = default_,
-                  tokentextoValorTexto = val_ (printCpfSoNumeros cpf),
-                  tokentextoConteudoDiarioId = val_ $ pk conteudoDiario,
-                  tokentextoTipo = val_ "CPF",
-                  tokentextoInicio = val_ pos,
-                  tokentextoComprimento = val_ (T.length cpfTexto)
-                }
-
-              TokenCnpj (cnpjTexto, cnpj) ->
-                beamInsertOnNoConflict conn (tokensTextoTbl diariosDb) Model.Diarios.TokenTexto {
-                  tokentextoId = default_,
-                  tokentextoValorTexto = val_ (printCnpjSoNumeros cnpj),
-                  tokentextoConteudoDiarioId = val_ $ pk conteudoDiario,
-                  tokentextoTipo = val_ "CNPJ",
-                  tokentextoInicio = val_ pos,
-                  tokentextoComprimento = val_ (T.length cnpjTexto)
-                }
-              
-              _ -> return ()
+        liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ " pronto."
+    
     CrawlError e          -> liftIO $ Prelude.putStrLn ("Erro: " ++ show e) >> return ()
     CrawlArquivoNaoExiste -> liftIO $ Prelude.putStrLn ("Não há diário a baixar para a data " ++ show hj) >> return ()

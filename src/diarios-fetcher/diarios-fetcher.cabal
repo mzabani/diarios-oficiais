@@ -29,7 +29,7 @@ library
                      , DiariosOficiais.Crawling
                      , Crawlers.Campinas
                      , Crawlers.Sumare
-                     , Crawlers.DOU1
+                     , Crawlers.DOU
                      , Buscador
                      , AwsUtils
                      , PdfParser.DocumentoParserInteligente
@@ -60,6 +60,7 @@ library
                      , directory
                      , typed-process
                      , postgresql-simple
+                     , postgresql-query
                      , beam-core
                      , beam-postgres
                      , brdocs
@@ -73,6 +74,10 @@ library
                      , unliftio
                      , aeson
                      , dlist
+                     , blaze-markup
+                     , blaze-html
+                     , these
+                     , monad-logger
   default-language:    Haskell2010
   ghc-options:        -Wno-simplifiable-class-constraints
   default-extensions: OverloadedStrings

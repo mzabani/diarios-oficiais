@@ -16,42 +16,48 @@ import System.Random
 import Text.XML.Cursor
 import Text.XML
 import qualified Text.HTML.DOM as HTML
+import DiariosOficiais.Crawling (ProcessadorConteudoLink(..))
+import DiariosOficiais.Xml (nodeText)
 
-parsePdfDetalhado :: (MonadIO m, MonadUnliftIO m) => [FilePath] -> m (Either () (InfoDocumento, [BlocoEInfo]))
-parsePdfDetalhado pdfFilePaths = do
-    someRandomNumber :: Int <- liftIO randomIO
-    allPages <-
-        forM pdfFilePaths $ \pdfPath -> do
-            bracket ((</> (show someRandomNumber <> "-html")) <$> getTemporaryDirectory) removeDirectoryRecursive $ \tempDir -> do
-                liftIO $ print tempDir
-                
-                _ <- readProcess (shell $ "pdftohtml \"" ++ pdfPath ++ "\" \"" ++ tempDir ++ "\"")
-                allHtmlFiles <- listDirectory tempDir
-                let pgNumParser = Parsec.string "page" >> Parsec.decimal >>= \d -> Parsec.string ".html" >> return (d :: Int)
-                    paginasEmOrdem = fmap fst $ List.sortOn snd $ rights $ fmap (\s -> (,) s <$> Parsec.parseOnly pgNumParser (Text.pack s)) allHtmlFiles
-                forM paginasEmOrdem $ \nomePagina -> do
-                    let htmlPath = tempDir </> nomePagina
-                    pg <- liftIO $ HTML.readFile htmlPath
-                    let docCursor  = fromDocument pg
-                        todosDivs = docCursor $// element "div" >=> hasAttribute "class" &| node
-                        divsEls = catMaybes $ fmap (\case NodeElement el -> Just el
-                                                          _              -> Nothing) todosDivs
-                    return $ Right (divListToPage divsEls)
-        
-    case sequenceA (mconcat allPages) of
-        Left err -> return $ Left err
-        Right pgs -> do
-            let doc = produzirDadosCompletos pgs
-            return (Right doc)
+parseLinkBaixadoDetalhado :: (MonadIO m, MonadUnliftIO m) => ProcessadorConteudoLink -> [FilePath] -> m (Either (InfoDocumento, [BlocoEInfo]) [Text])
+parseLinkBaixadoDetalhado procConteudo filePaths =
+    case procConteudo of
+        ProcessarPdf -> do
+            pdfPages <-
+                fmap mconcat $ forM filePaths $ \filePath -> do
+                    someRandomNumber :: Int <- liftIO randomIO
+                    bracket ((</> (show someRandomNumber <> "-html")) <$> getTemporaryDirectory) removeDirectoryRecursive $ \tempDir -> do
+                        _ <- readProcess (shell $ "pdftohtml \"" ++ filePath ++ "\" \"" ++ tempDir ++ "\"")
+                        allHtmlFiles <- listDirectory tempDir
+                        let pgNumParser = Parsec.string "page" >> Parsec.decimal >>= \d -> Parsec.string ".html" >> return (d :: Int)
+                            paginasEmOrdem = fmap fst $ List.sortOn snd $ rights $ fmap (\s -> (,) s <$> Parsec.parseOnly pgNumParser (Text.pack s)) allHtmlFiles
+                        forM paginasEmOrdem $ \nomePagina -> do
+                            let htmlPath = tempDir </> nomePagina
+                            pg <- liftIO $ HTML.readFile htmlPath
+                            let docCursor  = fromDocument pg
+                                todosDivs = docCursor $// element "div" >=> hasAttribute "class" &| node
+                                divsEls = catMaybes $ fmap (\case
+                                                                NodeElement el -> Just el
+                                                                _              -> Nothing) todosDivs
+                            return $ divListToPage divsEls
+            return $ Left $ produzirDadosCompletos pdfPages
 
-parsePdf :: (MonadIO m, MonadUnliftIO m) => [FilePath] -> m (Either () [Paragrafo])
-parsePdf pdfFilePaths = do
-    parseRes <- parsePdfDetalhado pdfFilePaths
+        ProcessarHtml nodeAxis -> do
+            fmap (Right . mconcat) $ forM filePaths $ \filePath -> do
+                pg <- liftIO $ HTML.readFile filePath
+                let docCursor  = fromDocument pg
+                    paragrafosNodes = nodeAxis docCursor
+                    paragrafosHtmls = fmap nodeText paragrafosNodes
+                return paragrafosHtmls
+
+parseLinkBaixado :: (MonadIO m, MonadUnliftIO m) => ProcessadorConteudoLink -> [FilePath] -> m (Either [Paragrafo] [Text])
+parseLinkBaixado procConteudo filePaths = do
+    parseRes <- parseLinkBaixadoDetalhado procConteudo filePaths
     case parseRes of
-        Left () -> return (Left ())
-        Right (docInfo, binfos) -> do
+        Right ps -> return $ Right ps
+        Left (docInfo, binfos) -> do
             let matchings = mkMatching (docInfo, binfos)
-            return $ Right $ mkParagrafos binfos matchings
+            return $ Left $ mkParagrafos binfos matchings
 
 divListToPage :: [Element] -> Page
 divListToPage blocks' = 

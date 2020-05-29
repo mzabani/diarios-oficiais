@@ -9,11 +9,11 @@ in pkgs.dockerTools.buildImage {
   name = "postgresql";
   tag = "latest";
 
-  # Parece que o postgresql não inicializa sem o bash..
+  # It seems postgresql needs bash..
   contents = [ pkgs.bash pkgs.coreutils pkgs.postgresql_12 pkgs.iputils ];
   runAsRoot = ''
     #!${pkgs.runtimeShell}
-    # Por algum motivo, sem LD_LIBRARY_PATH setado corretamente, o initdb falha..
+    # Without LD_LIBRARY_PATH correctly set, initdb fails..
     export PATH="/bin/"
     export LD_LIBRARY_PATH="/lib/"
     ${pkgs.dockerTools.shadowSetup}
