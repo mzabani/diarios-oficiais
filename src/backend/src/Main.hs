@@ -2,9 +2,9 @@ module Main where
 
 import Prelude hiding (readFile)
 import DbVcs (bringDbUpToDate)
+import Api (SinglePageAPI)
 import RIO
 import Servant
-import Servant.HTML.Blaze (HTML)
 import WaiAppStatic.Storage.Filesystem (defaultWebAppSettings)
 import WaiAppStatic.Types (StaticSettings(..), unsafeToPiece)
 import qualified Network.Wai.Handler.Warp as Warp
@@ -13,22 +13,14 @@ import DiariosOficiais.Database (createDbPool, getDbVcsInfo)
 import Database.PostgreSQL.Simple
 import Network.Wai.Middleware.Cors (cors, simpleCorsResourcePolicy, CorsResourcePolicy(..))
 import Data.Pool
-import qualified Text.Blaze.Html5 as Blaze
 import UnliftIO.Environment (getEnv)
 import RIO.Directory (doesFileExist)
 import System.FilePath ((</>))
 import qualified Busca as Busca
 import qualified Ler as Ler
-import qualified Common as Common
 import qualified System.IO as IO
 
 type AcmeChallengeAPI = ".well-known" :> "acme-challenge" :> Raw
-
-type SinglePageAPI = "busca" :> QueryParam' '[Required] "q" Text :> QueryParam' '[Required] "p" Int :> Get '[JSON] Common.ResultadoBusca
-                :<|> "ler" :> Capture "conteudoDiarioId" Int :> Get '[HTML] Blaze.Html
-                :<|> "listar-paragrafos-anteriores" :> Capture "paragrafoId" Int :> Get '[JSON] (Int, [(Int, Text)])
-                :<|> "listar-paragrafos-posteriores" :> Capture "paragrafoId" Int :> Get '[JSON] (Int, [(Int, Text)])
-                :<|> Raw
 
 staticFileSettings :: FilePath -> StaticSettings
 staticFileSettings frontendDir = (defaultWebAppSettings frontendDir) { ssIndices = [ unsafeToPiece "index.html" ] }
@@ -36,7 +28,6 @@ staticFileSettings frontendDir = (defaultWebAppSettings frontendDir) { ssIndices
 singlePageServer :: FilePath -> Pool Connection -> Server SinglePageAPI
 singlePageServer frontendDir connectionPool = 
                              Busca.buscaGet connectionPool
-                        :<|> Ler.lerDiario connectionPool
                         :<|> Ler.lerParagrafosAntes connectionPool
                         :<|> Ler.lerParagrafosDepois connectionPool
                         :<|> serveDirectoryWith (staticFileSettings frontendDir)
