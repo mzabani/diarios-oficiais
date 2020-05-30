@@ -5,6 +5,7 @@ import Data.Time
 import Database.Beam
 import qualified Database.Beam.Postgres as Pg
 import qualified Database.PostgreSQL.Simple as PGS
+import Database.PostgreSQL.Simple.FromField (FromField(..))
 import Data.Text
 
 data DiariosDb f = DiariosDb { origensDiarios :: f (TableEntity OrigemDiarioT), diarios :: f (TableEntity DiarioT), diariosABaixar :: f (TableEntity DiarioABaixarT), conteudosDiarios :: f (TableEntity ConteudoDiarioT), diariosABaixarToConteudosDiarios :: f (TableEntity DiarioABaixarToConteudoDiarioT), paragrafosDiarios :: f (TableEntity ParagrafoDiarioT), statusDownloads :: f (TableEntity StatusDownloadDiarioT), downloadsTerminados :: f (TableEntity DownloadTerminadoT), nomesEncontrados :: f (TableEntity NomeEncontradoT), tokensTextoTbl :: f (TableEntity TokenTextoT) } deriving Generic
@@ -32,6 +33,9 @@ data OrigemDiarioT f = OrigemDiario {
 } deriving Generic
 type OrigemDiario = OrigemDiarioT Identity
 type OrigemDiarioId = PrimaryKey OrigemDiarioT Identity
+deriving instance Eq OrigemDiarioId
+instance FromField (PrimaryKey OrigemDiarioT Identity) where
+    fromField field bs = OrigemDiarioId <$> fromField @Int field bs
 instance Beamable OrigemDiarioT
 instance Table OrigemDiarioT where
     data PrimaryKey OrigemDiarioT f = OrigemDiarioId (Columnar f Int) deriving Generic
@@ -55,10 +59,20 @@ instance Table DiarioT where
 instance Beamable (PrimaryKey DiarioT)
 
 getDiarioNaData :: MonadIO m => OrigemDiarioId -> Day -> PGS.Connection -> m (Maybe Diario)
-getDiarioNaData oid dataDiario conn = liftIO $ Pg.runBeamPostgresDebug putStrLn conn $ runSelectReturningOne $ select $ do
+getDiarioNaData oid dataDiario conn = liftIO $ Pg.runBeamPostgres conn $ runSelectReturningOne $ select $ do
     diario <- all_ (diarios diariosDb)
     guard_ $ diarioOrigemDiarioId diario ==. val_ oid &&. diarioData diario ==. val_ dataDiario
     return diario
+
+-- getDatasSemDiarios :: MonadIO m => Day -> Day -> PGS.Connection -> m [(Day, OrigemDiarioId)]
+-- getDatasSemDiarios dt1 dt2 conn = liftIO $ Pg.runBeamPostgresDebug putStrLn conn $ runSelectReturningList $ select $ do
+--     diario <- all_ (diarios diariosDb)
+--     dbaixar <- oneToMany_ (diariosABaixar diariosDb) diarioabaixarDiarioId diario
+--     statdwn <- oneToMany_ (statusDownloads diariosDb) statusdownloaddiarioDiarioABaixarId dbaixar
+--     _ <- oneToMany_ (downloadsTerminados diariosDb) downloadterminadoStatusDownloadDiarioId statdwn
+--     dt <- values_ [min dt1 dt2 .. max dt1 dt2] -- TODO: generate_series.. with todasDatas (data) as (select #{min} + (n || ' days')::interval from generate_series(0, #{diffDays ate de}) n)
+--     -- guard_' $  just_ dt ==?. diarioData diario
+--     pure (diarioData diario, diarioOrigemDiarioId diario)
 
 data DiarioABaixarT f = DiarioABaixar {
     diarioabaixarId :: C f Int,

@@ -14,6 +14,7 @@ let
     pkgs.pebble
     pkgs.procps
     pkgs.openssh
+    pkgs.cabal2nix
   ];
 
   postgres-service = import ./nix/postgres-service.nix { postgres = pkgs.postgresql_12; runInBackground=true; inherit pkgs; };
@@ -37,6 +38,7 @@ let
       beam-migrate =  reflexPkgs.haskell.lib.doJailbreak (self.callPackage ./nix/haskell/beam-migrate.nix {});
       beam-postgres = reflexPkgs.haskell.lib.doJailbreak (reflexPkgs.haskell.lib.dontCheck (self.callPackage ./nix/haskell/beam-postgres.nix {}));
       beam-core =     reflexPkgs.haskell.lib.doJailbreak (self.callPackage ./nix/haskell/beam-core.nix {});
+      postgresql-query = reflexPkgs.haskell.lib.dontCheck (reflexPkgs.haskell.lib.markUnbroken super.postgresql-query);
     };
 
     shells = {

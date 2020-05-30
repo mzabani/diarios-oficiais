@@ -1,0 +1,1 @@
+INSERT INTO origemdiario (id, nomecompleto) VALUES (4, 'Diário Oficial da União - Seção 2'), (5, 'Diário Oficial da União - Seção 3');

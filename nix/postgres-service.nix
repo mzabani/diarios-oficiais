@@ -10,7 +10,7 @@
     in
     utils.writeShellScriptInBinFolder "init-postgres" ''
 if [ "$(${ls} -A $PGDATA/*)" ]; then
-    ${echo} Postgres datadir não-vazio. Considerando-o inicializado
+    ${echo} Postgres datadir not empty. Considering it initialized.
 else
     ${postgres}/bin/initdb --locale=C.UTF8 -E UTF8 -U postgres -d $PGDATA
 fi
@@ -21,7 +21,7 @@ PGCTLSTATUS=$?
 set -e
 
 if [ "$PGCTLSTATUS" -eq "0" ]; then
-    ${echo} Postgres já iniciado
+    ${echo} Postgres already initialized.
 else
     ${cat} ${pg_hba_conf} > $PGDATA/pg_hba.conf
     ${cat} ${postgresql_conf} > $PGDATA/postgresql.conf
