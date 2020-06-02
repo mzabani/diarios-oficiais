@@ -28,6 +28,8 @@ executable frontend
                      , lens
                      , template-haskell
                      , these
+                     , servant
+                     , servant-reflex
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions: OverloadedStrings

@@ -11,11 +11,11 @@ data FormBusca = FormBusca {
 } deriving (Generic, ToJSON, FromJSON)
 
 -- TODO: Indexar comprimento de colunas e valores para que sejam iguais!
-data ResultadoBusca = ErroBusca Text | Resultados Int Resultado deriving (Generic, ToJSON, FromJSON)
+data ResultadoBusca = ErroBusca Text | Resultados Int Resultado deriving (Generic, ToJSON, FromJSON, Show)
 data Resultado = Resultado {
     colunas :: [Text],
     resultados :: [(Maybe Int, [Valor])]
-} deriving (Generic, ToJSON, FromJSON)
+} deriving (Generic, ToJSON, FromJSON, Show)
 
 -- | ValorMatch tem booleanos que indicam se palavra é um match de busca (e portanto deve ficar em negrito)
-data Valor = ValorTexto Text | ValorMatch [(Text, Bool)] | ValorLista [Valor] deriving (Generic, ToJSON, FromJSON)
+data Valor = ValorTexto Text | ValorMatch [(Text, Bool)] | ValorLista [Valor] deriving (Generic, ToJSON, FromJSON, Show)
