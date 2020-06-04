@@ -144,7 +144,7 @@ htmlBody = do
                         el "li" $ text "Tente também \"alvará deferido data>=2019-01-01 data<=2019-01-31 grupos:data\" para ver alvarás deferidos em todos diários oficiais disponíveis por data no mês de Janeiro/2019"
                         el "li" $ text "Tente também \"covid\" para ver medidas públicas relacionadas ao Corona Vírus"
                 
-                pgClickEv :: Event DomTimeline Int <- dynEv (traceDyn "Resultados" resultadosDyn) $ \case
+                pgClickEv :: Event DomTimeline Int <- dynEv resultadosDyn $ \case
                         NadaBuscado -> return never
                         Buscando (t, _) -> do
                             text $ "Buscando por '" <> t <> "'..."

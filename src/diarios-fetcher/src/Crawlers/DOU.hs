@@ -28,11 +28,11 @@ getLinks numeroDiarioOficial dt mgr = do
         [encodeUtf8 . nodeText -> jsonSummary] ->
             case decode (toS jsonSummary) of
                 Nothing -> return Nothing
-                Just TopLevelDOU1 { jsonArray = [] } -> return Nothing
-                Just TopLevelDOU1 { jsonArray } -> return $ Just $ fmap (("http://www.in.gov.br/web/dou/-/" <>) . urlTitle) $ List.sortOn numberPage jsonArray
+                Just TopLevelDOU { jsonArray = [] } -> return Nothing
+                Just TopLevelDOU { jsonArray } -> return $ Just $ fmap (("http://www.in.gov.br/web/dou/-/" <>) . urlTitle) $ List.sortOn numberPage jsonArray
         _ -> return Nothing
 
-data TopLevelDOU1 = TopLevelDOU1 {
+data TopLevelDOU = TopLevelDOU {
     jsonArray :: ![UrlEPagina]
 } deriving (Generic, FromJSON)
 
@@ -41,7 +41,7 @@ instance FromJSON UrlEPagina where
     parseJSON = withObject "UrlEPagina" $ \o -> UrlEPagina <$> o .: "urlTitle" <*> (fromMaybe (error "numberPage não é inteiro") . readMaybe <$> o .: "numberPage")
 
 douParagrafoAxis :: Cursor Node -> [Node]
-douParagrafoAxis doc = mconcat $ doc $// element "div" &| attributeIs "class" "texto-dou" &// element "p" &| node
+douParagrafoAxis doc = mconcat $ doc $// element "div" &| attributeIs "class" "texto-dou" &// element "p"  &| node
 
 toCrawlerNum :: IsCrawler c => Int -> OrigemDiarioId -> c -> Crawler
 toCrawlerNum numeroDiarioOficial origemId _ = Crawler {
