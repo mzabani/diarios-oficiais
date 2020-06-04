@@ -176,7 +176,7 @@ queryGrupos fb conn = case parseConsulta fb of
                 _          -> Nothing
             pegarFilterable = \case
                 FiltroConteudo s -> Just $ QueryFrag "paragrafodiario.portuguese_conteudo_tsvector @@ websearch_to_tsquery('portuguese', ?)" (Only s)
-                FiltroDiario   s -> Just $ QueryFrag "UNACCENT(nomeDiario) ILIKE ('%' || UNACCENT(?) || '%')" (Only (traceShowId s))
+                FiltroDiario   s -> Just $ QueryFrag "UNACCENT(nomeDiario) ILIKE ('%' || UNACCENT(?) || '%')" (Only s)
                 FiltroData  op s -> Just $ "dataDiario " <> operadorQueryFrag op <> QueryFrag "?" (Only s)
                 AgruparPor _     -> Just "true" -- TODO: GADT evitaria esse caso?
             pegarGroupable = \case
@@ -261,6 +261,8 @@ queryGrupos fb conn = case parseConsulta fb of
                     `UnsafeException.catch`
                     (\(_ :: IOException) -> return $ ErroBusca "Há algo de errado com a consulta. Por favor modifique/corrija a consulta e tente novamente.")
 
-buscaGet :: Pool Connection -> Text -> Int -> Servant.Handler ResultadoBusca
-buscaGet connPool q p =
+buscaGet :: Pool Connection -> Maybe Text -> Maybe Int -> Servant.Handler ResultadoBusca
+buscaGet _ Nothing _ = error "Oops"
+buscaGet _ _ Nothing = error "Oops"
+buscaGet connPool (Just q) (Just p) =
     withDbConnection connPool $ \conn -> queryGrupos (FormBusca q p) conn

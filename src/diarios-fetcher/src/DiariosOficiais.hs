@@ -45,7 +45,7 @@ hoje = liftIO $ localDay . zonedTimeToLocalTime <$> getZonedTime
 utcNow :: MonadIO m => m UTCTime
 utcNow = liftIO $ zonedTimeToUTC <$> getZonedTime
 
--- ^ Downloads the URL supplied and saves into the supplied directory, returning the full path of the saved file, whose
+-- | Downloads the URL supplied and saves into the supplied directory, returning the full path of the saved file, whose
 -- name is the file's MD5 hash
 downloadToAsMd5 :: (MonadThrow m, MonadUnliftIO m, MonadIO m) => Text -> FilePath -> Manager -> m (FilePath, Digest MD5)
 downloadToAsMd5 url dir mgr = do
@@ -110,7 +110,7 @@ start = do
                               join statusdownloaddiario on statusdownloaddiario.diarioabaixarid=diarioabaixar.id
                               join downloadterminado on downloadterminado.statusdownloaddiarioid=statusdownloaddiario.id
                               join diarioabaixartoconteudodiario dbctcb on dbctcb.diarioabaixarid = diarioabaixar.id
-                              where not exists (select 1 from paragrafodiario where paragrafodiario.conteudodiarioid = dbctcb.conteudodiarioid))
+                              where exists (select 1 from paragrafodiario where paragrafodiario.conteudodiarioid = dbctcb.conteudodiarioid))
                       select datasEOrigens.data, datasEOrigens.origemdiarioid
                         from datasEOrigens
                         left join datasEOrigensBaixados using (data, origemDiarioId)

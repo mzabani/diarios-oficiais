@@ -1,4 +1,4 @@
-{-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE PartialTypeSignatures, TypeFamilies, TypeApplications #-}
 import Data.Proxy
 import Data.Functor ((<&>))
 import Control.Lens ((&), (%~), (.~))
@@ -7,6 +7,9 @@ import Data.These (These)
 import Reflex.Dom
 import Reflex.Dom.Xhr
 import Reflex.Dom.Class
+import Servant.Reflex (client, HasClient, BaseUrl(..), ReqResult(..), QParam(..))
+import qualified Servant.Reflex
+import Servant.API ((:<|>)(..))
 import Data.Aeson
 import GHC.Generics
 import qualified Data.Map as Map
@@ -15,30 +18,47 @@ import Data.Text (Text)
 import Data.Time.Calendar
 import Control.Monad
 import Common
+import Api (SinglePageAPI)
 
-data Busca = NadaBuscado | Buscando (Text, Int) | BuscaTerminada ResultadoBusca
+data Busca = NadaBuscado | Buscando (Text, Int) | BuscaTerminada ResultadoBusca deriving Show
 
-data ListandoParagrafos = SemListar | Listando Int | ListaObtida (Maybe (Int, [(Int, Text)])) deriving Show
+data ListandoParagrafos = SemListar | Listando Int | ListaObtida (Int, [(Int, Text)]) deriving Show
 
-search querySearchedEv = do
-    responsesEv <- performRequestAsync $ toRequest <$> querySearchedEv
-    let buscaIniciadaEv = Buscando <$> querySearchedEv
-        resultadosChegaramEv = toBuscaTerminada <$> (decodeXhrResponse <$> responsesEv)
-    holdDyn NadaBuscado (leftmost [buscaIniciadaEv, resultadosChegaramEv])
-    where toRequest (termo, pagina) = xhrRequest "GET" ("/busca?q=" <> termo <> "&p=" <> tshow pagina) def
-          toBuscaTerminada Nothing = BuscaTerminada $ ErroBusca "Aconteceu um erro interno. Por favor atualize a página e tente novamente. Se persistir, reporte isso como um Bug."
-          toBuscaTerminada (Just res) = BuscaTerminada res
+search :: forall t m. MonadWidget t m => (Dynamic t (QParam Text) -> Dynamic t (QParam Int) -> Event t () -> m (Event t (ReqResult () ResultadoBusca))) -> Dynamic t Text -> Dynamic t Int -> Event t () -> m (Dynamic t Busca)
+search buscarClient queryStringDyn pgAtualDyn doSearchEv = do
+    let
+        mTermo = QParamSome <$> queryStringDyn
+        mPg    = QParamSome <$> pgAtualDyn
+    respReqResultEv <- buscarClient mTermo mPg doSearchEv
+    let 
+        resultadosEv = respReqResultEv <&> \case
+            ResponseSuccess () res _ -> BuscaTerminada res
+            ResponseFailure _ _ _   -> BuscaTerminada $ ErroBusca "Aconteceu um erro interno. Por favor atualize a página e tente novamente. Se persistir, reporte isso como um Bug."
+            _                     -> BuscaTerminada $ ErroBusca "Request não realizado. Por favor atualize a página e tente novamente. Se persistir, reporte isso como um Bug."
+        buscaIniciadaEv = Buscando <$> tagPromptlyDyn (zipDyn queryStringDyn pgAtualDyn) doSearchEv
+    holdDyn NadaBuscado (leftmost [buscaIniciadaEv, resultadosEv])
 
-listarParagrafos baseUrl paragrafoListEv = do
-    responsesEv <- performRequestAsync $ toRequest <$> paragrafoListEv
-    let buscaIniciadaEv = Listando <$> paragrafoListEv
-        resultadosChegaramEv = toBuscaTerminada <$> (decodeXhrResponse <$> responsesEv)
-    holdDyn SemListar (leftmost [buscaIniciadaEv, resultadosChegaramEv])
-    where toRequest pid = xhrRequest "GET" (baseUrl <> tshow pid) def
-          toBuscaTerminada = ListaObtida
+listarParagrafos :: forall t m. MonadWidget t m => (Dynamic t (Either Text Int) -> Event t () -> m (Event t (ReqResult () (Int, [(Int, Text)])))) -> Dynamic t Int -> Event t () -> m (Dynamic t ListandoParagrafos)
+listarParagrafos listarClient paragrafoIdDyn doSearchEv = do
+    let
+        mPid    = Right <$> paragrafoIdDyn
+    respReqResultEv <- listarClient mPid doSearchEv
+    let 
+        resultadosEv = respReqResultEv <&> \case
+            ResponseSuccess () res _ -> ListaObtida res
+            _ -> SemListar
+        buscaIniciadaEv = Listando <$> tag (current paragrafoIdDyn) doSearchEv
+    holdDyn SemListar (leftmost [buscaIniciadaEv, resultadosEv])
+    -- responsesEv <- performRequestAsync $ toRequest <$> paragrafoListEv
+    -- let buscaIniciadaEv = Listando <$> paragrafoListEv
+    --     resultadosChegaramEv = toBuscaTerminada <$> (decodeXhrResponse <$> responsesEv)
+    -- holdDyn SemListar (leftmost [buscaIniciadaEv, resultadosChegaramEv])
+    -- where toRequest pid = xhrRequest "GET" (baseUrl <> tshow pid) def
+    --       toBuscaTerminada = ListaObtida
 
 main = mainWidgetWithHead htmlHead htmlBody
 
+tshow :: Show a => a -> T.Text
 tshow = T.pack . show
 
 htmlHead :: Widget x ()
@@ -83,8 +103,12 @@ formPreventDefault c =
             & elementConfig_eventSpec %~ addEventSpecFlags (Proxy :: Proxy (DomBuilderSpace m)) Submit (const preventDefault)
     in element "form" cfg c
 
-htmlBody :: Widget x ()
+htmlBody :: forall t m. (t ~ DomTimeline, MonadWidget t m) => m ()
 htmlBody = do
+    let (buscarClient :<|> listarPsAnteriores :<|> listarPsPosteriores :<|> _) = client (Proxy :: Proxy SinglePageAPI)
+                                                        (Proxy :: Proxy m)
+                                                        (Proxy :: Proxy ())
+                                                        (constDyn (BasePath "/"))
     divClass "container" $ do
         divClass "row" $ do
             divClass "col-sm-12" $ mdo
@@ -95,12 +119,10 @@ htmlBody = do
                             pgAtualDyn <- holdDyn 1 $ leftmost [ pgClickEv, 1 <$ formSubmitEv ]
                             
                             let formSubmitEv = domEvent Submit form
-                                queryStringEv = tagPromptlyDyn (_inputElement_value input) formSubmitEv
-                            queryStringDyn <- holdDyn "" queryStringEv
-                            let
-                                searchFields = zipDyn queryStringDyn pgAtualDyn
-                                querySearchedEv = tagPromptlyDyn searchFields $ leftmost [ formSubmitEv, () <$ updated pgAtualDyn ]
-                            resultadosDyn <- search querySearchedEv
+                                queryStringDyn = _inputElement_value input
+                                doSearchEv = leftmost [ formSubmitEv, () <$ updated pgAtualDyn ]
+
+                            resultadosDyn <- search buscarClient queryStringDyn pgAtualDyn doSearchEv
                             let buscandoEv = fmap (\case Buscando _ -> True
                                                          _          -> False) $ updated resultadosDyn
                                 btnAttrs = Map.fromList [ ("type", "submit"), ("class", "btn btn-outline-secondary") ]
@@ -115,7 +137,7 @@ htmlBody = do
                         el "li" $ el "strong" (text "Sempre verifique o conteúdo encontrado") >> text " antes de assumir que encontrou o que pensava estar buscando"
                         el "li" $ text "O buscador busca parágrafos, mas o que é exatamente um parágrafo aqui pode variar muito, e geralmente não corresponderá ao que humanos entendem por parágrafo"
                     el "li" $ text "O código deste buscador é aberto. Acesse " >> elAttr "a" ("href" =: "https://github.com/mzabani/diarios-oficiais") (text "https://github.com/mzabani/diarios-oficiais") >> text " para ver."
-                    el "li" $ text "Por enquanto apenas o Diário Oficial da cidade de Campinas está disponível, " >> el "strong" (text "em geral") >> text " para os últimos 365 dias"
+                    el "li" $ text "Por enquanto apenas alguns Diários Oficiais estão disponíveis, " >> el "strong" (text "em geral") >> text " não mais do que do último ano"
                     el "li" $ text "Para fins de pesquisa, a busca avançada pode ajudar: tente por exemplo \"boletim de ocorrência grupos:data diario\" para ver o total de BOs (de forma aproximada) por cidade e data. Mude os grupos (mas use apenas \"data\" e \"diario\") para ver outras métricas"
                     el "ul" $ do
                         el "li" $ text "Tente também \"habite-se diario:Campinas data>=2019-02-01\" para ver parágrafos com \"habite-se\" da cidade de Campinas a partir de 1º de fevereiro de 2019"
@@ -147,18 +169,16 @@ htmlBody = do
                                         case mParagrafoId of
                                             Just paragrafoId -> mdo
                                                 carregarAnterioresClickEv <- elClass "p" "text-center" $ btnClass "btn btn-link" never $ el "small" $ text "Carregar parágrafos anteriores"
-                                                paragrafosAnterioresDyn <- listarParagrafos "/listar-paragrafos-anteriores/" (tag (current pidMaisAntigoDyn) carregarAnterioresClickEv)
-                                                paragrafosPosterioresDyn <- listarParagrafos "/listar-paragrafos-posteriores/" (tag (current pidMaisRecenteDyn) carregarPosterioresClickEv)
+                                                paragrafosAnterioresDyn <- listarParagrafos listarPsAnteriores pidMaisAntigoDyn carregarAnterioresClickEv
+                                                paragrafosPosterioresDyn <- listarParagrafos listarPsPosteriores pidMaisRecenteDyn carregarPosterioresClickEv
                                                 pidMaisAntigoDyn <- holdDyn paragrafoId $ fforMaybe (updated paragrafosAnterioresDyn) $ \case
                                                         SemListar -> Nothing
                                                         Listando _ -> Nothing
-                                                        ListaObtida Nothing -> Nothing
-                                                        ListaObtida (Just (_, ps)) -> fst <$> listToMaybe ps
+                                                        ListaObtida (_, ps) -> fst <$> listToMaybe ps
                                                 pidMaisRecenteDyn <- holdDyn paragrafoId $ fforMaybe (updated paragrafosPosterioresDyn) $ \case
                                                         SemListar -> Nothing
                                                         Listando _ -> Nothing
-                                                        ListaObtida Nothing -> Nothing
-                                                        ListaObtida (Just (_, ps)) -> fst <$> listToMaybe (reverse ps)
+                                                        ListaObtida (_, ps) -> fst <$> listToMaybe (reverse ps)
                                                 -- Até o merge de https://github.com/reflex-frp/reflex-dom/pull/255, precisamos verificar
                                                 -- se a Response já foi processada armazenando o paragrafoId mais recente..
                                                 todosParagrafosAnterioresDyn <- foldDynMaybe (\mpps (ultimoPid, todosPs) -> 
@@ -168,8 +188,7 @@ htmlBody = do
                                                             if pid == ultimoPid then Nothing else Just (pid, ps ++ todosPs)) ((-1), []) $ updated paragrafosAnterioresDyn <&> \case
                                                                 SemListar -> Nothing
                                                                 Listando _ -> Nothing
-                                                                ListaObtida Nothing -> Nothing
-                                                                ListaObtida (Just (pid, ps)) -> Just (pid, fmap snd ps)
+                                                                ListaObtida (pid, ps) -> Just (pid, fmap snd ps)
                                                 todosParagrafosPosterioresDyn <- foldDynMaybe (\mpps (ultimoPid, todosPs) -> 
                                                     case mpps of
                                                         Nothing -> Nothing
@@ -177,8 +196,7 @@ htmlBody = do
                                                             if pid == ultimoPid then Nothing else Just (pid, todosPs ++ ps)) ((-1), []) $ updated paragrafosPosterioresDyn <&> \case
                                                                 SemListar -> Nothing
                                                                 Listando _ -> Nothing
-                                                                ListaObtida Nothing -> Nothing
-                                                                ListaObtida (Just (pid, ps)) -> Just (pid, fmap snd ps)
+                                                                ListaObtida (pid, ps) -> Just (pid, fmap snd ps)
                                                 dyn_ $ todosParagrafosAnterioresDyn <&> \(_, ps) -> forM_ ps (\t -> el "p" $ text t)
                                                 el "p" $ renderValor v
                                                 dyn_ $ todosParagrafosPosterioresDyn <&> \(_, ps) -> forM_ ps (\t -> el "p" $ text t)

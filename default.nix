@@ -32,6 +32,7 @@ let
       common = ./src/common;
       backend = ./src/backend;
       frontend = ./src/frontend;
+      servant-reflex = ./servant-reflex;
     };
 
     overrides = self: super: {
@@ -42,8 +43,8 @@ let
     };
 
     shells = {
-      ghc = ["common" "backend" "frontend" "brdocs" "diarios-fetcher" ];
-      ghcjs = ["common" "frontend"];
+      ghc = ["common" "backend" "frontend" "brdocs" "diarios-fetcher" "servant-reflex" ];
+      ghcjs = ["common" "frontend" "servant-reflex" ];
     };
   });
 in

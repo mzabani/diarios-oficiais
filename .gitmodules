@@ -1,3 +1,9 @@
 [submodule "reflex-platform"]
 	path = reflex-platform
 	url = https://github.com/mzabani/reflex-platform.git
+[submodule "nixpkgs"]
+	path = nixpkgs
+	url = https://github.com/mzabani/nixpkgs.git
+[submodule "servant-reflex"]
+	path = servant-reflex
+	url = https://github.com/mzabani/servant-reflex.git

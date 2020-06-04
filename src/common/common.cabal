@@ -16,16 +16,18 @@ extra-source-files:  ChangeLog.md
 cabal-version:       >=1.10
 
 library
-  exposed-modules: Common
+  exposed-modules: Common, Api
   -- other-modules:
   -- other-extensions:
   build-depends:       base >=4.12 && <4.13
                      , aeson
                      , time
                      , text
+                     , servant
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions:  DataKinds
                      , DeriveGeneric
                      , DeriveAnyClass
                      , OverloadedStrings
+                     , TypeOperators
