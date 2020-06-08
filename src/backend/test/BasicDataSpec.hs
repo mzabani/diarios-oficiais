@@ -13,4 +13,4 @@ spec = do
 multiplasOrigensDeDiarios :: DB.Connection -> IO ()
 multiplasOrigensDeDiarios conn = do
     [ DB.Only (cnt :: Int) ] <- DB.query conn "SELECT COUNT(*) FROM origemdiario" ()
-    cnt `shouldSatisfy` (== 0)
+    cnt `shouldSatisfy` (> 0)
