@@ -12,6 +12,7 @@ import UnliftIO.Concurrent (threadDelay)
 import RIO.List (sortOn)
 import RIO.Directory (listDirectory)
 import RIO.ByteString (readFile)
+import qualified RIO.List as List
 import System.FilePath ((</>))
 
 data DbVcsInfo = DbVcsInfo {
@@ -24,7 +25,7 @@ data DbVcsInfo = DbVcsInfo {
     -- ^ A Connection String which has the power to create databases, grant privileges and a lot more.
     , sqlMigrationsDirs :: [FilePath]
     -- ^ A list of directories with .sql files. Any .sql file that must be applied in after another .sql file must be alphabetically
-    --   greater than the first, even if they are in different directories.
+    --   greater than the first, even if they are in different directories. Filed whose names don't end in .sql are ignored.
 }
 
 -- | Tries to connect until a connection succeeds or until a timeout, executes the supplied action and disposes of the opened Connection.
@@ -72,7 +73,7 @@ bringDbUpToDate DbVcsInfo { superUserConnString, dbName, appUser, sqlMigrationsD
                 execvoid_ conn $ "ALTER DEFAULT PRIVILEGES FOR USER postgres IN SCHEMA public GRANT EXECUTE ON ROUTINES TO " <> unsafeAppUser
         sqlMigrationFiles :: [(FilePath, FilePath)] <- fmap (sortOn fst) $ fmap concat $ forM sqlMigrationsDirs $ \dir -> do
             filesInDir <- listDirectory dir
-            return $ fmap (\fn -> (fn, dir </> fn)) filesInDir
+            return $ fmap (\fn -> (fn, dir </> fn)) $ filter (".sql" `List.isSuffixOf`) filesInDir
         print sqlMigrationFiles
         sqlMigrationsContents <- sqlMigrationFiles `forM` \(fn, fp) -> (fn,) <$> readFile fp
         DB.withTransaction conn $ do
