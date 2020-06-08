@@ -6,7 +6,7 @@ import qualified Data.Text as T
 import qualified Text.Blaze.Html5 as Blaze
 import Database.PostgreSQL.Simple
 import Data.Pool
-import BeamUtils
+import DbUtils
 
 
 lerDiario :: Pool Connection -> Int -> Servant.Handler Blaze.Html

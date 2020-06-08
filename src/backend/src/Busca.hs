@@ -12,7 +12,7 @@ import Database.PostgreSQL.Simple.FromField
 import Database.PostgreSQL.Simple.FromRow
 import qualified Database.PostgreSQL.Simple.Internal as PgInternal
 import Data.Pool
-import BeamUtils
+import DbUtils
 import Common
 import qualified Control.Exception as UnsafeException
 

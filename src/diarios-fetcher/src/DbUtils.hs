@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes, FlexibleContexts, PartialTypeSignatures, ScopedTypeVariables #-}
-module BeamUtils (beamInsertOrThrow, beamInsertReturningOrThrow, beamInsertOnNoConflict, beamInsertOrGet, beamInsertOrGet_, beamDelete, withDbConnection, withDbTransaction, withDbTransaction_, RowOperation(..), MonadBeamPostgres) where
+module DbUtils (beamInsertOrThrow, beamInsertReturningOrThrow, beamInsertOnNoConflict, beamInsertOrGet, beamInsertOrGet_, beamDelete, withDbConnection, withDbTransaction, withDbTransaction_, RowOperation(..), MonadBeamPostgres) where
 
 import Data.Conduit
 import Database.Beam

@@ -1,12 +1,12 @@
 {-# LANGUAGE PartialTypeSignatures #-}
 module Model.Diarios where
 
+import RIO
 import Data.Time
 import Database.Beam
 import qualified Database.Beam.Postgres as Pg
 import qualified Database.PostgreSQL.Simple as PGS
 import Database.PostgreSQL.Simple.FromField (FromField(..))
-import Data.Text
 
 data DiariosDb f = DiariosDb { origensDiarios :: f (TableEntity OrigemDiarioT), diarios :: f (TableEntity DiarioT), diariosABaixar :: f (TableEntity DiarioABaixarT), conteudosDiarios :: f (TableEntity ConteudoDiarioT), diariosABaixarToConteudosDiarios :: f (TableEntity DiarioABaixarToConteudoDiarioT), paragrafosDiarios :: f (TableEntity ParagrafoDiarioT), statusDownloads :: f (TableEntity StatusDownloadDiarioT), downloadsTerminados :: f (TableEntity DownloadTerminadoT), nomesEncontrados :: f (TableEntity NomeEncontradoT), tokensTextoTbl :: f (TableEntity TokenTextoT) } deriving Generic
 instance Database be DiariosDb
@@ -63,6 +63,14 @@ getDiarioNaData oid dataDiario conn = liftIO $ Pg.runBeamPostgres conn $ runSele
     diario <- all_ (diarios diariosDb)
     guard_ $ diarioOrigemDiarioId diario ==. val_ oid &&. diarioData diario ==. val_ dataDiario
     return diario
+
+diarioPossuiParagrafos :: MonadIO m => ConteudoDiarioId -> PGS.Connection -> m Bool
+diarioPossuiParagrafos cdid conn = liftIO $ do
+    oneIfExists <- Pg.runBeamPostgres conn $ runSelectReturningOne $ select $ do
+        cd <- all_ (conteudosDiarios diariosDb)
+        guard_ $ pk cd ==. val_ cdid
+        return $ pk cd
+    return $ isJust oneIfExists
 
 -- getDatasSemDiarios :: MonadIO m => Day -> Day -> PGS.Connection -> m [(Day, OrigemDiarioId)]
 -- getDatasSemDiarios dt1 dt2 conn = liftIO $ Pg.runBeamPostgresDebug putStrLn conn $ runSelectReturningList $ select $ do

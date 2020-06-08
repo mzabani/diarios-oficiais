@@ -1,4 +1,4 @@
-module Main where
+module LibMain where
 
 import Prelude hiding (readFile)
 import DbVcs (bringDbUpToDate)
