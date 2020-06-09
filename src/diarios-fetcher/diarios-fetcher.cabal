@@ -23,7 +23,7 @@ library
   exposed-modules:     DiariosOficiais
                      , DiariosOficiais.Database
                      , Model.Diarios
-                     , BeamUtils
+                     , DbUtils
                      , DbVcs
   other-modules:       DiariosOficiais.Xml
                      , DiariosOficiais.Crawling
@@ -72,6 +72,7 @@ library
                      , regex
                      , random
                      , unliftio
+                     , unliftio-core
                      , aeson
                      , dlist
                      , blaze-markup

@@ -40,6 +40,7 @@ let
       beam-postgres = reflexPkgs.haskell.lib.doJailbreak (reflexPkgs.haskell.lib.dontCheck (self.callPackage ./nix/haskell/beam-postgres.nix {}));
       beam-core =     reflexPkgs.haskell.lib.doJailbreak (self.callPackage ./nix/haskell/beam-core.nix {});
       postgresql-query = reflexPkgs.haskell.lib.dontCheck (reflexPkgs.haskell.lib.markUnbroken super.postgresql-query);
+      tmp-postgres = reflexPkgs.haskell.lib.dontCheck (self.callHackage "tmp-postgres" "1.34.1.0" {});
     };
 
     shells = {
@@ -53,7 +54,7 @@ in
 
     ghc = reflexProj.ghc;
 
-    ghc-static = builtins.mapAttrs (k: pkgs.haskell.lib.justStaticExecutables) ghc;
+    ghc-static = builtins.mapAttrs (k: v: pkgs.haskell.lib.justStaticExecutables (pkgs.haskell.lib.dontCheck v)) ghc;
     
     shells = {
       ghcjs = reflexProj.shells.ghcjs;

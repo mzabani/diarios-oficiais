@@ -1,7 +1,7 @@
 module DiariosOficiais (start) where
 
 import Model.Diarios
-import BeamUtils
+import DbUtils
 import DiariosOficiais.Crawling
 import DiariosOficiais.Database
 import RIO
@@ -77,7 +77,7 @@ start = do
   basePath <- fromMaybe "./data/diarios-oficiais/" <$> lookupEnv "DIARIOSDIR"
   dbVcsInfo <- getDbVcsInfo
   -- Apply DB migrations if necessary
-  bringDbUpToDate dbVcsInfo
+  void $ bringDbUpToDate dbVcsInfo
   bracket (createDbPool 1 60 50) (destroyAllResources) $ \dbPool -> do
     createDirectoryIfMissing False basePath
     -- awsConfig <- createAwsConfiguration
@@ -232,8 +232,8 @@ downloadEIndexar hj AppContext{..} sub = do
         -- Aqui pegamos um md5sum de todo o conteúdo.
         let conteudoMd5Sum = hashFinalize $ hashUpdates (hashInit @MD5) $ fmap encodeUtf8 paragrafosDiario
             md5sumString   = show conteudoMd5Sum
-        conteudoDiario <- withDbTransaction conn $ do
-          conteudoDiario <- beamInsertOrGet_ conn (conteudosDiarios diariosDb) ConteudoDiario {
+        (conteudoDiario, alreadyExisted) <- withDbTransaction conn $ do
+          (conteudoDiario, alreadyExisted) <- beamInsertOrGet conn (conteudosDiarios diariosDb) ConteudoDiario {
             conteudodiarioId = default_,
             conteudodiarioMd5Sum = val_ $ toS md5sumString
           } (\t -> conteudodiarioMd5Sum t ==. val_ (toS md5sumString))
@@ -242,24 +242,29 @@ downloadEIndexar hj AppContext{..} sub = do
             diarioabaixartoconteudodiarioDiarioABaixarId = val_ $ pk diarioABaixar,
             diarioabaixartoconteudodiarioConteudoDiarioId = val_ $ pk conteudoDiario
           }
-          return conteudoDiario
+          return (conteudoDiario, alreadyExisted)
 
-        -- TODO: Tudo daqui pra baixo deveria ser uma função separada para que possa ser executada
-        -- para diários antigos quando introduzimos novidades (e.g. mais tokens buscáveis)
-        
-        liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ ": persistindo " ++ show (length paragrafosDiario) ++ " parágrafos"
-        withDbTransaction_ conn $ do
-          -- TODO: insertOnConflictUpdate ao invés de beamInsertOnNoConflict e apagar apenas parágrafos com ordem maior que o último (código comentado mais abaixo)
-          beamDelete conn (paragrafosDiarios diariosDb) (\pd -> paragrafodiarioConteudoDiarioId pd ==. val_ (pk conteudoDiario))
-          forM_ (RIO.zip [0..] paragrafosDiario) $ \(i, htmlParagrafo) -> do
-            beamInsertOnNoConflict conn (paragrafosDiarios diariosDb) ParagrafoDiario {
-              paragrafodiarioId = default_,
-              paragrafodiarioConteudoDiarioId = val_ $ pk conteudoDiario,
-              paragrafodiarioOrdem = val_ i,
-              paragrafodiarioConteudo = val_ htmlParagrafo
-            }
+        jaPossuiParagrafos <- diarioPossuiParagrafos (pk conteudoDiario) conn
 
-        liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ " pronto."
+        case (alreadyExisted, jaPossuiParagrafos) of
+          (RowExisted, True) -> liftIO $ putStrLn $ show sub ++ " da data " ++ show hj ++ ": já existia e nada mudou."
+          _ -> do
+            -- TODO: Tudo daqui pra baixo deveria ser uma função separada para que possa ser executada
+            -- para diários antigos quando introduzimos novidades (e.g. mais tokens buscáveis)
+            
+            liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ ": persistindo " ++ show (length paragrafosDiario) ++ " parágrafos"
+            withDbTransaction_ conn $ do
+              -- TODO: insertOnConflictUpdate ao invés de beamInsertOnNoConflict e apagar apenas parágrafos com ordem maior que o último (código comentado mais abaixo)
+              beamDelete conn (paragrafosDiarios diariosDb) (\pd -> paragrafodiarioConteudoDiarioId pd ==. val_ (pk conteudoDiario))
+              forM_ (RIO.zip [0..] paragrafosDiario) $ \(i, htmlParagrafo) -> do
+                beamInsertOnNoConflict conn (paragrafosDiarios diariosDb) ParagrafoDiario {
+                  paragrafodiarioId = default_,
+                  paragrafodiarioConteudoDiarioId = val_ $ pk conteudoDiario,
+                  paragrafodiarioOrdem = val_ i,
+                  paragrafodiarioConteudo = val_ htmlParagrafo
+                }
+
+            liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ " pronto."
     
     CrawlError e          -> liftIO $ Prelude.putStrLn ("Erro: " ++ show e) >> return ()
     CrawlArquivoNaoExiste -> liftIO $ Prelude.putStrLn ("Não há diário a baixar para a data " ++ show hj) >> return ()

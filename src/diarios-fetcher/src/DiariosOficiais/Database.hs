@@ -1,5 +1,5 @@
 module DiariosOficiais.Database (
-      createDbPool, getDbVcsInfo
+      createDbPool, getDbVcsInfo, getAppConnString
 ) where
 
 import Data.Pool
@@ -11,8 +11,8 @@ import Text.Read
 import Data.Maybe
 import RIO
 
-getConnString :: MonadIO m => m ConnectInfo
-getConnString = do
+getAppConnString :: MonadIO m => m ConnectInfo
+getAppConnString = do
     user <- getEnv "PGAPPUSER"
     port <- fromMaybe (error "No PGPORT defined") <$> (readMaybe <$> getEnv "PGPORT")
     db <- getEnv "PGDATABASE"
@@ -29,16 +29,16 @@ getSqlMigrationsConnString = do
 getDbVcsInfo :: MonadIO m => m DbVcsInfo
 getDbVcsInfo = do
       superUserConnString <- getSqlMigrationsConnString
-      appConnString <- getConnString
+      appConnString <- getAppConnString
       sqlMigrationsDir <- getEnv "SQL_MIGRATIONS_DIR"
       return DbVcsInfo {
             superUserConnString = superUserConnString
             , dbName = connectDatabase appConnString
             , appUser = connectUser appConnString
-            , sqlMigrationsDir = sqlMigrationsDir
+            , sqlMigrationsDirs = [ sqlMigrationsDir ]
       }
 
 createDbPool :: MonadIO m => Int -> NominalDiffTime -> Int -> m (Pool Connection)
 createDbPool numStripes keepUnusedConnFor maxConnsOpenPerStripe = liftIO $ do
-      connString <- getConnString
+      connString <- getAppConnString
       createPool (connect connString) close numStripes keepUnusedConnFor maxConnsOpenPerStripe

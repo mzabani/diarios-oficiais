@@ -34,7 +34,7 @@ in pkgs.dockerTools.buildImage {
   '';
 
   config = {
-    Cmd = [ "/bin/run-backend-with-certbot" "/bin/run-certbot" "/bin/backend" ];
+    Cmd = [ "/bin/run-backend-with-certbot" "/bin/run-certbot" "/bin/backend-exe" ];
     User = "diarios-backend:diarios-backend";
   };
 }

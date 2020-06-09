@@ -20,6 +20,10 @@ dev-build-frontend:
 	# nix-shell --arg env-file ./env/dev/docker.env -A shells.ghcjs default.nix --run \
 	# 	"cabal --project-file=cabal-ghcjs.project --builddir=dist-ghcjs build frontend && cabal --project-file=cabal-ghcjs.project --builddir=dist-ghcjs --installdir=./results/frontend/ install frontend"
 
+.PHONY: test
+test:
+	cabal test -O0 --test-show-details=streaming all
+
 .PHONY: docker-backend
 docker-backend:
 	${NIXBUILD_DOCKER} -o results/docker-backend nix/docker/diarios-backend.nix
@@ -61,21 +65,10 @@ simul-prod:
 	pkill -x pebble || true
 	docker-compose -f docker-compose.simul-prod.yaml up
 
-.PHONY: ghcid-frontend
-ghcid-frontend:
-	ghcid -W -c "cabal repl frontend --disable-optimization"
-
-.PHONY: ghcid-backend
-ghcid-backend:
-	ghcid -W -c "cabal repl backend --disable-optimization"
-
-.PHONY: ghcid-fetcher
-ghcid-fetcher:
-	ghcid -W -c "cabal repl diarios-fetcher --disable-optimization"
-
 hoogle:
-	hoogle server --local --port=8000 2>/dev/null 1>/dev/null &
-	xdg-open http://localhost:8000/ 2>/dev/null 1>/dev/null &
+	pkill -x hoogle || true
+	hoogle server --local --port=3000 2>/dev/null 1>/dev/null &
+	xdg-open http://localhost:3000/ 2>/dev/null 1>/dev/null &
 
 profile-diarios:
 	cabal build --enable-profiling diarios-fetcher-exe

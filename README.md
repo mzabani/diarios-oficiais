@@ -11,8 +11,8 @@
 ### 2. Running the application
 
 1. Run `make fetch` to download the Diários Oficiais (Official Journals) or else there won't be anything to search for. You can stop fetching by typing Ctrl+C any time; no fetched journals will be lost when you do this.
-2. Run `make dev-build-frontend; cabal run backend`.
-3. Only if this is the very first time you typed `cabal run backend`, a TLS certificate will need to be acquired. Run `make run-certbot` in a separate development shell **without stopping the backend** and wait until it succeeds. Now you can kill the backend and run `cabal run backend` again.
+2. Run `make dev-build-frontend; cabal run -O0 backend-exe`.
+3. Only if this is the very first time you typed `cabal run -O0 backend-exe`, a TLS certificate will need to be acquired. Run `make run-certbot` in a separate development shell **without stopping the backend** and wait until it succeeds. Now you can kill the backend and run `cabal run -O0 backend-exe` again.
 4. Go to 'https://localhost:8083/' to test. Ignore any safety risks; they only exist because the certificate is a "toy" certificate, not signed by a trusted CA.
 
 ### 3. Simulating Production locally
@@ -41,7 +41,7 @@ Production server by (note that this is still a very rough guide, lots of other 
 ### 5. Development environment
 
 - Run `make hoogle` to open a Browser with hoogle for locally generated Docs.
-- Run `make ghcid-backend` and `make ghcid-frontend` to help you see errors "real-time" while you develop.
+- Run `./scripts/ghcid.sh backend`, `./scripts/ghcid.sh frontend`, `./scripts/ghcid.sh backend-test` and others to help you see errors "real-time" while you develop.
 
 ### Treinar algoritmo de Machine Learning
 
