@@ -19,8 +19,8 @@ library
   hs-source-dirs:      src
   default-language:    Haskell2010
   exposed-modules:     LibMain
-  other-modules:       ServantExtensions
                      , Busca
+  other-modules:       ServantExtensions
                      , Ler
   build-depends:       base
                      , common
@@ -86,14 +86,16 @@ executable backend-exe
   build-depends:       base
                      , backend
 
-test-suite backend-test
+test-suite backend-tests
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Main.hs
   other-modules:       AllSpecs
                      , BasicDataSpec
+                     , BuscaSpec
                      , TestDb
   build-depends:       backend
+                     , common
                      , QuickCheck
                      , base
                      , rio
@@ -108,3 +110,4 @@ test-suite backend-test
                      , ViewPatterns
                      , ScopedTypeVariables
                      , TupleSections
+                     , TypeApplications

@@ -43,7 +43,7 @@ data Consulta = Consulta {
     , _where :: [FiltroBusca]
     , _grupos :: [Text]
     , _pagina :: Int
-}
+} deriving Show
 
 data OperadorSql = Igual | Menor | Maior | MenorIgual | MaiorIgual deriving Show
 operadorQueryFrag :: OperadorSql -> QueryFrag
@@ -219,7 +219,7 @@ queryGrupos fb conn = case parseConsulta fb of
                                 <> "       join origemdiario on diario.origemdiarioid = origemdiario.id "
                                 <> "       order by diarioabaixar.diarioid, downloadterminado.momentotermino desc)"
                     
-                    pquery@(QueryFrag finalQuery _) = if not possuiAgrupamento then
+                    pquery = if not possuiAgrupamento then
                                     "with " <> conteudosCte
                                 <> " , resultados as (select " <> selectClause <> ", paragrafodiario.id"
                                 <> "       from paragrafodiario"
@@ -247,8 +247,7 @@ queryGrupos fb conn = case parseConsulta fb of
                             <> " select resultados.*, qtdResultados.qtd from resultados, qtdResultados "
                             <> offsetClause
                             <> limitClause
-                                
-                liftIO $ Prelude.print finalQuery
+                
                 liftIO $ (do
                     res <- runQueryWith rowParserComAuxiliares conn pquery
                     let qtdRes = case res of
