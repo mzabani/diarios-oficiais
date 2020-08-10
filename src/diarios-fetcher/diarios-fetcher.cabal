@@ -57,6 +57,7 @@ library
                      , conduit-extra
                      , filepath
                      , temporary
+                     , connection
                      , cryptonite
                      , cryptonite-conduit
                      , directory

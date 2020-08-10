@@ -52,13 +52,13 @@ fetchContinuamente :: AppContext -> IO ()
 fetchContinuamente ctx = forever $ do
     hj <- hoje
     forM_ allCrawlers $ \sub -> do
-        catchAny (downloadEIndexar hj ctx sub) $ const $ do
+        catchAny (downloadEIndexar hj False ctx sub) $ const $ do
             liftIO $ putStrLn $ "Falha ao baixar diário " ++ toS (crawlerNome sub) ++ ", data " ++ show hj
         putStrLn "Diários baixados. Esperando 1 hora para baixar novamente."
         threadDelay (1000 * 1000 * 60 * 60) -- Espera 1 hora até tentar de novo
 
 fetch :: AppContext -> FetchArgs -> IO ()
-fetch ctx@(AppContext { dbPool }) (FetchArgs de ate _) = do
+fetch ctx@(AppContext { dbPool }) (FetchArgs de ate manterArquivos) = do
     datasEDiariosFaltando :: [(Day, OrigemDiarioId)] <- withDbConnection dbPool $ \conn ->
         runNoLoggingT $ PQ.runPgMonadT conn $
         PQ.pgQuery [PQ.sqlExp|
@@ -68,24 +68,32 @@ fetch ctx@(AppContext { dbPool }) (FetchArgs de ate _) = do
                         select distinct diario.data, diario.origemdiarioid
                         from diario
                         join diarioabaixar on diarioabaixar.diarioid=diario.id
-                        join statusdownloaddiario on statusdownloaddiario.diarioabaixarid=diarioabaixar.id
-                        join downloadterminado on downloadterminado.statusdownloaddiarioid=statusdownloaddiario.id
                         join diarioabaixartoconteudodiario dbctcb on dbctcb.diarioabaixarid = diarioabaixar.id
-                        where exists (select 1 from paragrafodiario where paragrafodiario.conteudodiarioid = dbctcb.conteudodiarioid))
+                        join conteudodiario on conteudodiario.id=dbctcb.conteudodiarioid
+                        where not conteudodiario.diario_existe
+                            or exists (select 1 from paragrafodiario where paragrafodiario.conteudodiarioid = dbctcb.conteudodiarioid))
                 select datasEOrigens.data, datasEOrigens.origemdiarioid
                 from datasEOrigens
                 left join datasEOrigensBaixados using (data, origemDiarioId)
-                where datasEOrigensBaixados.data is null|]
+                where datasEOrigensBaixados.data is null
+                order by datasEOrigens.data, datasEOrigens.origemdiarioid|]
     let datasECrawlersFaltando :: [(Day, Crawler)] = mapMaybe (\(dt, origemId) -> (dt,) <$> Fold.find ((== origemId) . crawlerOrigemDiarioId) allCrawlers) datasEDiariosFaltando
-    forM_ datasECrawlersFaltando $ \(dt, cr) -> downloadEIndexar dt ctx cr
+    forM_ datasECrawlersFaltando $ \(dt, cr) -> downloadEIndexar dt manterArquivos ctx cr
 
 -- | Baixa o diário e atualiza o banco de dados para torná-lo buscável
-downloadEIndexar :: (MonadThrow m, MonadUnliftIO m, MonadIO m) => Day -> AppContext -> Crawler -> m ()
-downloadEIndexar hj AppContext{..} sub = do
+downloadEIndexar :: (MonadThrow m, MonadUnliftIO m, MonadIO m) => Day -> Bool -> AppContext -> Crawler -> m ()
+downloadEIndexar hj manterArquivos AppContext{..} sub = do
   liftIO $ Prelude.putStrLn $ "Baixando " ++ show sub ++ " da data " ++ show hj
   crawlRes <- findLinks sub hj mgr
   case crawlRes of
-    CrawlDiarios links procConteudo -> do
+    CrawlDiarios links procConteudo -> registrarDiario links procConteudo
+    CrawlArquivoNaoExiste -> do
+      liftIO $ Prelude.putStrLn ("Não há diário a baixar para a data " ++ show hj)
+      registrarDiario [] ProcessarPdf -- Tanto faz se é PDF ou HTML aqui
+    CrawlError e          -> liftIO $ Prelude.putStrLn ("Erro: " ++ show e)
+
+  where
+    registrarDiario links procConteudo =
       liftIO $ withDbConnection dbPool $ \conn -> do
         diarioABaixar <- withDbTransaction conn $ do
           diarioExistenteMaybe <- getDiarioNaData (crawlerOrigemDiarioId sub) hj conn
@@ -124,7 +132,8 @@ downloadEIndexar hj AppContext{..} sub = do
               downloadterminadoStatusDownloadDiarioId = val_ $ primaryKey sd,
               downloadterminadoMomentoTermino = val_ downloadEnd,
               downloadterminadoMd5Sum = val_ $ toS (show md5),
-              downloadterminadoFilePath = val_ $ toS contentsFilePath
+              downloadterminadoFilePath = if manterArquivos then val_ (Just $ toS contentsFilePath)
+                                          else val_ Nothing
             }
           return contentsFilePath
           ) statusDownloads
@@ -138,7 +147,8 @@ downloadEIndexar hj AppContext{..} sub = do
         (conteudoDiario, alreadyExisted) <- withDbTransaction conn $ do
           (conteudoDiario, alreadyExisted) <- beamInsertOrGet conn (conteudosDiarios diariosDb) ConteudoDiario {
             conteudodiarioId = default_,
-            conteudodiarioMd5Sum = val_ $ toS md5sumString
+            conteudodiarioMd5Sum = val_ $ toS md5sumString,
+            conteudodiarioDiarioExiste = val_ $ paragrafosDiario /= []
           } (\t -> conteudodiarioMd5Sum t ==. val_ (toS md5sumString))
           beamInsertOrThrow conn (diariosABaixarToConteudosDiarios diariosDb) DiarioABaixarToConteudoDiario {
             diarioabaixartoconteudodiarioId = default_,
@@ -150,7 +160,6 @@ downloadEIndexar hj AppContext{..} sub = do
         jaPossuiParagrafos <- diarioPossuiParagrafos (pk conteudoDiario) conn
 
         case (alreadyExisted, jaPossuiParagrafos) of
-          (RowExisted, True) -> liftIO $ putStrLn $ show sub ++ " da data " ++ show hj ++ ": já existia e nada mudou."
           _ -> do
             -- TODO: Tudo daqui pra baixo deveria ser uma função separada para que possa ser executada
             -- para diários antigos quando introduzimos novidades (e.g. mais tokens buscáveis)
@@ -167,10 +176,9 @@ downloadEIndexar hj AppContext{..} sub = do
                   paragrafodiarioConteudo = val_ htmlParagrafo
                 }
 
+            unless manterArquivos $ forM_ downloads removeFile
             liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ " pronto."
-    
-    CrawlError e          -> liftIO $ Prelude.putStrLn ("Erro: " ++ show e) >> return ()
-    CrawlArquivoNaoExiste -> liftIO $ Prelude.putStrLn ("Não há diário a baixar para a data " ++ show hj) >> return ()
+        
 
 -- | Downloads the URL supplied and saves into the supplied directory, returning the full path of the saved file, whose
 -- name is the file's MD5 hash

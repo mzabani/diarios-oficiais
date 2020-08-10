@@ -67,9 +67,9 @@ getDiarioNaData oid dataDiario conn = liftIO $ Pg.runBeamPostgres conn $ runSele
 diarioPossuiParagrafos :: MonadIO m => ConteudoDiarioId -> PGS.Connection -> m Bool
 diarioPossuiParagrafos cdid conn = liftIO $ do
     oneIfExists <- Pg.runBeamPostgres conn $ runSelectReturningOne $ select $ do
-        cd <- all_ (conteudosDiarios diariosDb)
-        guard_ $ pk cd ==. val_ cdid
-        return $ pk cd
+        parag <- all_ (paragrafosDiarios diariosDb)
+        guard_ $ paragrafodiarioConteudoDiarioId parag ==. val_ cdid
+        return $ pk parag
     return $ isJust oneIfExists
 
 -- getDatasSemDiarios :: MonadIO m => Day -> Day -> PGS.Connection -> m [(Day, OrigemDiarioId)]
@@ -97,7 +97,10 @@ instance Beamable (PrimaryKey DiarioABaixarT)
 
 data ConteudoDiarioT f = ConteudoDiario {
     conteudodiarioId :: C f Int,
-    conteudodiarioMd5Sum :: C f Text
+    conteudodiarioMd5Sum :: C f Text,
+    conteudodiarioDiarioExiste :: C f Bool
+    -- ^ Indica se o Diário existe de fato ou se este é um "Diário vazio",
+    --   utilizado para representar a ausência de Diário Oficial.
 } deriving Generic
 type ConteudoDiario = ConteudoDiarioT Identity
 type ConteudoDiarioId = PrimaryKey ConteudoDiarioT Identity
@@ -154,7 +157,7 @@ data DownloadTerminadoT f = DownloadTerminado {
     downloadterminadoStatusDownloadDiarioId :: PrimaryKey StatusDownloadDiarioT f,
     downloadterminadoMomentoTermino :: C f UTCTime,
     downloadterminadoMd5Sum :: C f Text,
-    downloadterminadoFilePath :: C f Text
+    downloadterminadoFilePath :: C f (Maybe Text)
 } deriving Generic
 type DownloadTerminado = DownloadTerminadoT Identity
 type DownloadTerminadoId = PrimaryKey DownloadTerminadoT Identity

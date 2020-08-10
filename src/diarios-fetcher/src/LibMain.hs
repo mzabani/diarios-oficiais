@@ -9,13 +9,20 @@ import qualified Fetcher
 import Options.Applicative
 import qualified Network.HTTP.Client as Http
 import qualified Network.HTTP.Client.TLS as Http
+import Network.Connection (TLSSettings(..))
 import qualified Treinar
 import UnliftIO.Directory (createDirectoryIfMissing)
 import UnliftIO.Environment
 
-data FullArgs = Reindexar | Treinar String | FetchContinuamente | Fetch Fetcher.FetchArgs
+data FullArgs = FullArgs Args Bool
+data Args = Reindexar | Treinar String | FetchContinuamente | Fetch Fetcher.FetchArgs
 
-argsParser :: Parser FullArgs
+fullArgsParser :: Parser FullArgs
+fullArgsParser = FullArgs
+  <$> argsParser
+  <*> switch (long "nao-verif-certs" <> help "Aceitar qualquer certificado TLS (perigoso)!")
+
+argsParser :: Parser Args
 argsParser =
   flag' Reindexar (long "reindexar" <> help "Reindexar diários baixados - ainda não implementado")
   <|>
@@ -37,15 +44,17 @@ argsParser =
 start :: IO ()
 start = doWork =<< execParser opts
   where
-    opts = info (argsParser <**> helper)
+    opts = info (fullArgsParser <**> helper)
       ( fullDesc
       -- <> progDesc "Descrição"
       -- <> header "Cabeçalho"
       )
 
 doWork :: FullArgs -> IO ()
-doWork args = do
-  let mgrSettings = Http.tlsManagerSettings { Http.managerModifyRequest = \req -> return req { Http.requestHeaders = [("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36")] } }
+doWork (FullArgs args disableCerts) = do
+  let
+    tlsSettings = TLSSettingsSimple disableCerts False False
+    mgrSettings = (Http.mkManagerSettings tlsSettings Nothing) { Http.managerModifyRequest = \req -> return req { Http.requestHeaders = [("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36")] } }
   mgr <- Http.newManager mgrSettings
   basePath <- fromMaybe "./data/diarios-oficiais/" <$> lookupEnv "DIARIOSDIR"
   dbVcsInfo <- getDbVcsInfo
