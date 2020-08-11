@@ -1,0 +1,1 @@
+alter table downloadterminado alter column filepath drop not null;

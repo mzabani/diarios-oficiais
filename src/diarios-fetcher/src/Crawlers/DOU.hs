@@ -19,7 +19,7 @@ getLinks :: (MonadThrow m, MonadIO m) => Int -> Day -> Manager -> m (Maybe [T.Te
 getLinks numeroDiarioOficial dt mgr = do
     let (ano, mes, dia) = toGregorian dt
         diaMesAno = toS (tshow dia) <> "-" <> toS (tshow mes) <> "-" <> toS (tshow ano)
-        url             = "http://www.in.gov.br/leiturajornal?secao=do" <> show numeroDiarioOficial <> "&data=" <> diaMesAno
+        url             = "https://www.in.gov.br/leiturajornal?secao=do" <> show numeroDiarioOficial <> "&data=" <> diaMesAno
     req <- liftIO $ parseRequest url
     resp <- liftIO $ httpLbs req mgr
     let docCursor  = fromDocument $ parseLBS $ responseBody resp
@@ -29,7 +29,7 @@ getLinks numeroDiarioOficial dt mgr = do
             case decode (toS jsonSummary) of
                 Nothing -> return Nothing
                 Just TopLevelDOU { jsonArray = [] } -> return Nothing
-                Just TopLevelDOU { jsonArray } -> return $ Just $ fmap (("http://www.in.gov.br/web/dou/-/" <>) . urlTitle) $ List.sortOn numberPage jsonArray
+                Just TopLevelDOU { jsonArray } -> return $ Just $ fmap (("https://www.in.gov.br/web/dou/-/" <>) . urlTitle) $ List.sortOn numberPage jsonArray
         _ -> return Nothing
 
 data TopLevelDOU = TopLevelDOU {

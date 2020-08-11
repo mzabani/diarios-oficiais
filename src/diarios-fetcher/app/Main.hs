@@ -1,6 +1,6 @@
 module Main where
 
-import DiariosOficiais (start)
+import LibMain (start)
 import qualified System.IO as IO
 
 main :: IO ()

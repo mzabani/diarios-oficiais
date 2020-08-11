@@ -8,6 +8,7 @@ let
   shellPkgs = [
     pdftohtml
     pkgs.automake
+    pkgs.awscli
     pkgs.docker-compose
     pkgs.gnused
     pkgs.certbot
