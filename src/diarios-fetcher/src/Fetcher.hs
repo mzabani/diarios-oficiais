@@ -78,7 +78,11 @@ fetch ctx@(AppContext { dbPool }) (FetchArgs de ate manterArquivos) = do
                 where datasEOrigensBaixados.data is null
                 order by datasEOrigens.data, datasEOrigens.origemdiarioid|]
     let datasECrawlersFaltando :: [(Day, Crawler)] = mapMaybe (\(dt, origemId) -> (dt,) <$> Fold.find ((== origemId) . crawlerOrigemDiarioId) allCrawlers) datasEDiariosFaltando
-    forM_ datasECrawlersFaltando $ \(dt, cr) -> downloadEIndexar dt manterArquivos ctx cr
+    forM_ datasECrawlersFaltando $ \(dt, cr) -> 
+      downloadEIndexar dt manterArquivos ctx cr `catchAny` \e -> do
+        print e
+        putStrLn "Ignorando exceção e continuando em 10 segundos..."
+        threadDelay (1000 * 1000 * 10)
 
 -- | Baixa o diário e atualiza o banco de dados para torná-lo buscável
 downloadEIndexar :: (MonadThrow m, MonadUnliftIO m, MonadIO m) => Day -> Bool -> AppContext -> Crawler -> m ()
@@ -88,7 +92,7 @@ downloadEIndexar hj manterArquivos AppContext{..} sub = do
   case crawlRes of
     CrawlDiarios links procConteudo -> registrarDiario links procConteudo
     CrawlArquivoNaoExiste -> do
-      liftIO $ Prelude.putStrLn ("Não há diário a baixar para a data " ++ show hj)
+      liftIO $ Prelude.putStrLn "Diário inexistente"
       registrarDiario [] ProcessarPdf -- Tanto faz se é PDF ou HTML aqui
     CrawlError e          -> liftIO $ Prelude.putStrLn ("Erro: " ++ show e)
 
@@ -138,8 +142,10 @@ downloadEIndexar hj manterArquivos AppContext{..} sub = do
           return contentsFilePath
           ) statusDownloads
 
-        liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ " baixado com " ++ show (length downloads) ++ " URLs baixadas. Persistindo hash do conteúdo do diário"
-        paragrafosDiario :: [Text] <- either (fmap PP.printParagrafo) id <$> PP.parseLinkBaixado procConteudo downloads
+        liftIO $ Prelude.putStrLn $ show (length downloads) ++ " URLs baixadas. Transformando conteúdo dos arquivos em parágrafos..."
+        !(paragrafosDiario :: [Text]) <- either (fmap PP.printParagrafo) id <$> PP.parseLinkBaixado procConteudo downloads
+        liftIO $ Prelude.putStrLn $ "Parágrafos obtidos. Persistindo hash do conteúdo do diário..."
+        
 
         -- Aqui pegamos um md5sum de todo o conteúdo.
         let conteudoMd5Sum = hashFinalize $ hashUpdates (hashInit @MD5) $ fmap encodeUtf8 paragrafosDiario
@@ -160,11 +166,12 @@ downloadEIndexar hj manterArquivos AppContext{..} sub = do
         jaPossuiParagrafos <- diarioPossuiParagrafos (pk conteudoDiario) conn
 
         case (alreadyExisted, jaPossuiParagrafos) of
+          (RowExisted, True) -> liftIO $ putStrLn $ "Diário já existia e nada mudou."
           _ -> do
             -- TODO: Tudo daqui pra baixo deveria ser uma função separada para que possa ser executada
             -- para diários antigos quando introduzimos novidades (e.g. mais tokens buscáveis)
             
-            liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ ": persistindo " ++ show (length paragrafosDiario) ++ " parágrafos"
+            liftIO $ Prelude.putStrLn $ "Persistindo " ++ show (length paragrafosDiario) ++ " parágrafos..."
             withDbTransaction_ conn $ do
               -- TODO: insertOnConflictUpdate ao invés de beamInsertOnNoConflict e apagar apenas parágrafos com ordem maior que o último (código comentado mais abaixo)
               beamDelete conn (paragrafosDiarios diariosDb) (\pd -> paragrafodiarioConteudoDiarioId pd ==. val_ (pk conteudoDiario))
@@ -177,7 +184,8 @@ downloadEIndexar hj manterArquivos AppContext{..} sub = do
                 }
 
             unless manterArquivos $ forM_ downloads removeFile
-            liftIO $ Prelude.putStrLn $ show sub ++ " da data " ++ show hj ++ " pronto."
+            liftIO $ Prelude.putStrLn "Tudo pronto."
+
         
 
 -- | Downloads the URL supplied and saves into the supplied directory, returning the full path of the saved file, whose
